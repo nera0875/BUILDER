@@ -67,7 +67,8 @@ shift 2
 ROUTES=("$@")
 
 # Display
-clear
+echo ""
+echo ""
 print_header "📋 PLAN CRÉATION: $PROJECT_NAME"
 print_empty
 print_section "🎯 STACK TECHNIQUE"
