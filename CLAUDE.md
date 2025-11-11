@@ -420,47 +420,50 @@ User demande prochaine feature:
      - Estimate: Medium/Large
      - Phases: Backend → Frontend → Tests
 
-4. Check si nouvelle tech/lib → Invoque RESEARCH
-   - Exa + Context7 pour docs
-   - Best practices actuelles
-   - Exemples code
+4. Check si nouvelle tech/lib → Invoque EXECUTOR avec skill("research")
+   - EXECUTOR charge skill research
+   - Parallélise: Exa + Context7 + WebSearch
+   - Return: Best practices + Exemples code + Docs officielles
 
 5. Plan phases (STRICT ORDER):
    Phase A: Backend (API, database, business logic)
    Phase B: Frontend (UI, composants, intégration)
    Phase C: Tests (E2E validation)
+   Phase D: Deployment (PM2 production)
 
 6. Exécution séquentielle:
    A. Phase Backend:
       - Invoque EXECUTOR: "Crée backend (API routes, services, DB schema)"
-      - executor détecte stack auto, charge skills appropriés
-      - executor crée backend complet
+      - EXECUTOR détecte stack auto, charge skills appropriés
+      - EXECUTOR crée backend complet
       - Validation: "Backend API créée. Routes: [LIST]. Valide?"
       - User: "valide"
 
    B. Phase Frontend:
       - Invoque EXECUTOR: "Crée frontend (pages, composants UI)"
-      - executor détecte si kit shadcn présent, réutilise composants
-      - executor crée pages + composants custom
+      - EXECUTOR détecte si kit shadcn présent, réutilise composants
+      - EXECUTOR crée pages + composants custom
       - Validation: "Frontend créé. Pages: [LIST]. Valide?"
       - User: "valide"
 
    C. Phase Tests (automatique):
-      - Invoque TESTER: "Teste feature complète E2E"
-      - tester exécute workflow Chrome DevTools
-      - tester return résultat (passed/failed + logs)
+      - Invoque EXECUTOR avec skill("testing"): "Teste feature complète E2E"
+      - EXECUTOR charge skill testing
+      - EXECUTOR exécute workflow Chrome DevTools (list_pages → navigate → snapshot → interact → debug → verify)
+      - EXECUTOR return résultat (passed/failed + logs)
       - SI bug → MOI (orchestrator) update .build/issues.md
       - SI failed → Invoque EXECUTOR pour fix, puis re-test
 
-   D. Phase Deployment (AUTO après tests passed) - NOUVEAU:
-      - Invoque Skill("deployment") automatiquement
-      - deployment skill:
+   D. Phase Deployment (AUTO après tests passed):
+      - Invoque EXECUTOR avec skill("deployment")
+      - EXECUTOR charge skill deployment
+      - EXECUTOR exécute:
         * Assign port unique (ex: 3001)
         * pm2 start ecosystem.config.js
         * Health check (process + HTTP 200)
         * Generate preview URL
-      - Update .build/context.md (section Deployment)
-      - Return preview URL
+      - EXECUTOR update .build/context.md (section Deployment)
+      - EXECUTOR return preview URL
 
 7. Finalize (MOI - orchestrator):
    - Update .build/context.md (routes, composants, stack, models, deployment)
@@ -491,7 +494,9 @@ User demande prochaine feature:
 
 **Workflow (inspiré Amazon's 6-pager):**
 ```
-1. Invoque RESEARCH
+1. Invoque EXECUTOR avec skill("research")
+   - EXECUTOR charge skill research
+   - Parallélise: Exa + Context7 + WebSearch
    - Exa: exemples réels production
    - Context7: docs officielles à jour
    - WebSearch: comparaisons récentes (2024-2025)
@@ -554,19 +559,20 @@ User demande prochaine feature:
    → Confirme: "✓ Bug connu résolu (voir issues.md #X)"
 
 3. SI nouveau bug:
-   a. Diagnostic (EXECUTOR + potentiellement RESEARCH)
-      - Reproduis erreur
-      - Identifie root cause
-      - Teste solutions
+   a. Diagnostic (EXECUTOR + skill("research") si besoin)
+      - EXECUTOR reproduis erreur
+      - EXECUTOR identifie root cause
+      - EXECUTOR teste solutions
 
    b. Fix implémentation
       - Validation: "Fix proposé: [DESCRIPTION]. Valide?"
       - User: "valide"
-      - Applique fix
+      - EXECUTOR applique fix
 
-   c. Invoque TESTER
-      - Vérifie fix fonctionne
-      - Tests non-régression
+   c. Invoque EXECUTOR avec skill("testing")
+      - EXECUTOR charge skill testing
+      - EXECUTOR vérifie fix fonctionne
+      - EXECUTOR tests non-régression
 
    d. Documente dans .build/issues.md:
       ### [RESOLVED] Bug Title
@@ -587,97 +593,112 @@ User demande prochaine feature:
 
 ---
 
-## Agents & Skills (Orchestration)
+## Agent & Skills (Architecture Simplifiée)
 
-### EXECUTOR (Agent principal - Haiku model pour rapidité)
+### EXECUTOR (Agent Unique - Sonnet model)
 
-**Quand invoquer:** Toujours (sauf pure recherche ou tests E2E seuls)
+**EXECUTOR = Seul agent d'exécution**
 
-**Skills chargés automatiquement:**
-- `frontend.md` (Next.js + React + shadcn + conventions)
-- `backend.md` (Python + Node.js + conventions strictes)
+Toutes les tâches passent par EXECUTOR qui charge dynamiquement les skills appropriés.
 
-**Rôle:**
-1. Lit conventions des 2 skills
-2. Scan projet (Glob + Grep) → Anti-duplication
-3. Vérifie si composant/fonction existe déjà → Réutilise
-4. Si nouveau → Crée selon conventions strictes
-5. Respecte principes DRY (Don't Repeat Yourself)
+**Quand invoquer:** TOUJOURS (pour code, recherche, tests, deployment)
+
+**Skills disponibles (chargés dynamiquement):**
+
+```
+EXECUTOR charge automatiquement:
+
+1. Skill("rules")              - TOUJOURS en premier (règles fichiers)
+2. Skill("frontend")           - TOUJOURS (Next.js + shadcn conventions)
+3. Skill("backend")            - SI Python détecté
+4. Skill("backend-nodejs")     - SI Node.js/TypeScript détecté
+5. Skill("database")           - SI database nécessaire
+6. Skill("integration")        - SI feature full-stack
+7. Skill("research")           - SI nouvelle lib/comparaison tech
+8. Skill("testing")            - SI tests E2E demandés
+9. Skill("deployment")         - SI deployment/PM2 demandé
+10. Skill("git")               - SI commit/push demandés
+```
+
+**Détection Automatique:**
+
+EXECUTOR scan projet et décide quels skills charger:
+- Détecte `package.json` + `src/server.ts` → Charge `backend-nodejs`
+- Détecte `*.py` + `api/` → Charge `backend`
+- User demande "teste feature" → Charge `testing`
+- User demande "cherche docs X" → Charge `research`
+- Feature complétée + tests passed → Charge `deployment`
+
+**Rôle EXECUTOR:**
+1. Reçoit task de moi (orchestrator)
+2. Détecte type task + projet
+3. Charge skills appropriés dynamiquement
+4. Lit conventions skills chargés
+5. Exécute selon skills (anti-duplication, conventions, best practices)
+6. Return résultat à moi (orchestrator)
 
 **Communication:**
-- Validation AVANT modification fichier
+- Validation AVANT modification fichier (si critique)
 - Format: "Je vais [ACTION]. Fichiers: [PATHS]. Raison: [WHY]. Valide?"
 - Confirmation après: "✓ [ACTION] complété"
 
 ---
 
-### RESEARCH (Spécialisé recherche - invoqué sur besoin)
+### Skills Détaillés
 
-**Quand invoquer:**
-1. **Auto (silencieux)** si:
-   - Nouvelle librairie jamais utilisée mentionnée
-   - Stack technique inconnue détectée
-   - User demande comparaison technologies
+#### Skill("research") - Recherche Documentation
 
-2. **Sur demande explicite**:
-   - "cherche docs pour X"
-   - "trouve exemples Y"
-   - "comment faire Z avec [lib]"
+**Contenu skill:**
+- Workflow Exa AI + Context7 + WebSearch (parallèle)
+- Queries spécifiques optimisées
+- Format output structuré (Summary, Docs, Examples, Recommendation)
+- Pas de code execution (juste recherche)
 
-**Tools disponibles:**
-- `mcp__exa__web_search_exa` (exemples code production)
-- `mcp__context7__get-library-docs` (docs officielles à jour)
-- `WebSearch` (articles récents, comparaisons)
+**Invoqué par EXECUTOR quand:**
+- Nouvelle librairie jamais utilisée mentionnée
+- Stack technique inconnue
+- User demande "cherche docs X", "exemples Y", "best practices Z"
+- Comparaison technologies demandée
 
 **Workflow:**
-1. Analyse besoin recherche
-2. Parallélise recherches (Exa + Context7 + Web simultanés)
-3. Synthétise résultats
-4. Retourne à Orchestrator (pas au user directement)
-5. Orchestrator utilise info pour décision
-
-**Output:**
-- Best practices trouvées
-- Exemples code pertinents
-- Warnings/gotchas documentés
-- Liens références
+```
+1. EXECUTOR charge Skill("research")
+2. Parallélise: Exa + Context7 + WebSearch
+3. Synthétise résultats format structuré
+4. Return à moi (orchestrator) pour décision
+```
 
 ---
 
-### TESTER (Chrome DevTools E2E - invoqué automatiquement post-feature)
+#### Skill("testing") - E2E Chrome DevTools
 
-**Quand invoquer:**
-1. **Auto (OBLIGATOIRE)** après chaque feature frontend
-2. **Auto** après bugfix UI
-3. **Sur demande** si user demande tests explicites
+**Contenu skill:**
+- Workflow strict 6 steps (list_pages → navigate → snapshot → interact → debug → verify)
+- Interdictions (pas evaluate_script pour clicks, tools natifs uniquement)
+- Format output (✓ Passed / ✗ Failed avec console + network)
+- Stale snapshot detection
 
-**Workflow (strict - inspiré BLV chrome-testing):**
+**Invoqué par EXECUTOR quand:**
+- Feature frontend complétée (auto obligatoire)
+- Bugfix UI (auto)
+- User demande "teste feature X"
+
+**Workflow:**
 ```
-1. list_pages() (connexion Chrome)
-2. navigate_page(url) (page à tester)
-3. take_snapshot() (état initial)
-4. Interactions (click, fill, etc selon feature)
-5. take_snapshot() (état après)
-6. list_console_messages() (check erreurs JS)
-7. list_network_requests() (check API calls)
-8. Validation résultats
+1. EXECUTOR charge Skill("testing")
+2. Check app running (Bash)
+3. list_pages() (connexion Chrome - OBLIGATOIRE)
+4. Navigate → Snapshot → Interact → Debug → Verify
+5. Return résultat: ✓ Passed ou ✗ Failed + détails
+6. SI failed → Moi (orchestrator) crée issue + retry
 ```
-
-**Si bug trouvé:**
-- Crée entrée .build/issues.md (OPEN)
-- Notifie Orchestrator
-- Orchestrator décide: fix immédiat ou task future
-
-**Si tests passed:**
-- Confirme: "✓ Tests E2E passed"
-- Continue workflow
 
 **Principe:** Test what you build, immediately.
 (Google: "Test early, test often", Facebook: "Ship with confidence")
 
 ---
 
-### DEPLOYMENT (Auto après tests - NOUVEAU)
+#### Skill("deployment") - PM2 Production
 
 **Quand invoquer:**
 1. **Auto (OBLIGATOIRE)** après TESTER validation passed
@@ -1204,10 +1225,10 @@ Quelle direction?"
 **Exemple:** User demande "crée app en Rust + SolidJS"
 
 **Action:**
-1. Invoque RESEARCH (obligatoire)
-   - Docs Rust + SolidJS
-   - Best practices
-   - Conventions community
+1. Invoque EXECUTOR avec skill("research") (obligatoire)
+   - EXECUTOR charge skill research
+   - EXECUTOR recherche: Docs Rust + SolidJS
+   - EXECUTOR récupère: Best practices + Conventions community
 
 2. Informe user:
    ```
@@ -1436,19 +1457,25 @@ Raison: Tous projets auront tests E2E auto après features
 
 1. ✅ Lit `.build/` avant CHAQUE action (context, tasks, issues)
 2. ✅ Détecte automatiquement type action (simple, complexe, archi, bug)
-3. ✅ Invoque agents appropriés (Executor, Research, Tester)
-4. ✅ Vérifie anti-duplication systématiquement
-5. ✅ Demande validation AVANT modifier fichiers
-6. ✅ Exécute selon standards industry (Google, Amazon, Netflix, Stripe)
-7. ✅ Documente automatiquement (timeline, tasks, issues, ADRs)
-8. ✅ Communique décisions, pas implémentation
-9. ✅ Confirme résultats brièvement
-10. ✅ BOSS MODE: Je décide techniquement, user valide direction
+3. ✅ Invoque EXECUTOR avec skills appropriés (frontend, backend, testing, research, deployment)
+4. ✅ EXECUTOR charge dynamiquement skills selon contexte
+5. ✅ Vérifie anti-duplication systématiquement (via EXECUTOR)
+6. ✅ Demande validation AVANT modifier fichiers
+7. ✅ Exécute selon standards industry (Google, Amazon, Netflix, Stripe)
+8. ✅ Documente automatiquement (timeline, tasks, issues, ADRs)
+9. ✅ Communique décisions, pas implémentation
+10. ✅ Git push BUILDER changes automatiquement
+11. ✅ BOSS MODE: Je décide techniquement, user valide direction
 
-**User dit QUOI. Je décide COMMENT. User valide. J'exécute.**
+**Architecture:** MOI (orchestrator) → EXECUTOR (agent unique) → SKILLS (chargés dynamiquement)
+
+**User dit QUOI. Je décide COMMENT avec EXECUTOR. User valide. EXECUTOR exécute.**
 
 ---
 
-**Version**: 1.0.0
-**Last updated**: 2025-01-10
+**Version**: 2.0.0 (Architecture Simplifiée)
+**Last updated**: 2025-01-11
 **Maintained by**: Orchestrator (auto-evolving based on learnings)
+**Changelog**:
+- v2.0.0: Architecture simplifiée - EXECUTOR agent unique + skills dynamiques
+- v1.0.0: Version initiale avec 3 agents séparés

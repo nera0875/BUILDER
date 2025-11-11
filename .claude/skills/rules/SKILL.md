@@ -48,9 +48,9 @@ allowed-tools: None
 - `prisma/schema.prisma` (Database schema)
 
 ### Documentation Centralisée (.build/ uniquement)
-- `.build/context.md` (état projet)
-- `.build/timeline.md` (historique)
-- `.build/tasks.md` (tâches)
+- `.build/context.md` (état projet - routes, models, deployment, stack)
+- `.build/timeline.md` (historique actions)
+- `.build/tasks.md` (tâches en cours)
 - `.build/issues.md` (bugs/solutions)
 - `.build/decisions/*.md` (ADRs numérotés: 000-xxx.md, 001-xxx.md)
 
@@ -90,11 +90,11 @@ Check: .md hors .build/ → ❌ Interdit
 ```
 projet/
 ├── .build/              # Documentation centralisée (SEUL endroit .md)
-│   ├── context.md
-│   ├── timeline.md
-│   ├── tasks.md
-│   ├── issues.md
-│   └── decisions/
+│   ├── context.md       # Routes, models, deployment, stack
+│   ├── timeline.md      # Historique actions
+│   ├── tasks.md         # Tasks en cours
+│   ├── issues.md        # Bugs + solutions
+│   └── decisions/       # ADRs
 │       └── 000-xxx.md
 ├── app/                 # Next.js pages
 ├── components/          # React components
@@ -133,10 +133,16 @@ projet/
 
 ## 🚫 Exemples Interdictions
 
-### ❌ Fichiers à NE JAMAIS créer:
+### ❌ Fichiers à NE JAMAIS créer (racine projet):
 ```
+API_ROUTES.md                # → Mettre dans .build/docs/api-routes.md
+BACKEND_SETUP.md             # → Mettre dans .build/docs/backend-setup.md
+DEPLOYMENT.md                # → Mettre dans .build/docs/deployment.md
+FRONTEND_README.md           # → Mettre dans .build/docs/frontend-guide.md
+QUICK_START.md               # → Mettre dans .build/docs/quick-start.md
+PROJECT_STATUS.md            # → Mettre dans .build/context.md
 README.md                    # Sauf si user demande explicitement
-ARCHITECTURE.md
+ARCHITECTURE.md              # → Mettre dans .build/decisions/
 WORKFLOW.md
 GUIDE.md
 SETUP.md
@@ -151,13 +157,14 @@ custom-config.json           # Non-standard
 
 ### ✅ Fichiers autorisés:
 ```
-.build/context.md            # Documentation projet
-.build/decisions/001-use-prisma.md  # ADR
-app/dashboard/page.tsx       # Code
-components/ui/button.tsx     # Code
-lib/utils.ts                 # Code
-prisma/schema.prisma         # Config standard
-package.json                 # Config standard
+.build/context.md                    # Documentation projet (routes, models, deployment)
+.build/timeline.md                   # Historique actions
+.build/decisions/001-use-prisma.md   # ADR
+app/dashboard/page.tsx               # Code
+components/ui/button.tsx             # Code
+lib/utils.ts                         # Code
+prisma/schema.prisma                 # Config standard
+package.json                         # Config standard
 ```
 
 ---
@@ -199,6 +206,55 @@ User: "oui" → Agent crée
 
 ---
 
+## 🚨 ENFORCEMENT STRICT
+
+**AVANT toute création fichier .md:**
+
+```python
+# Pseudo-code vérification obligatoire
+file_to_create = "QUICK_START.md"
+
+allowed_md_patterns = [
+  r"^\.build/context\.md$",
+  r"^\.build/timeline\.md$",
+  r"^\.build/tasks\.md$",
+  r"^\.build/issues\.md$",
+  r"^\.build/decisions/\d{3}-.*\.md$"   # ADRs numérotés
+]
+
+if not matches_any_pattern(file_to_create, allowed_md_patterns):
+  # ❌ VIOLATION DÉTECTÉE
+
+  raise Error(f"""
+  ❌ VIOLATION RULES SKILL
+
+  Tentative création: {file_to_create}
+  → Interdit (seul ORCHESTRATOR peut créer .md)
+
+  ✅ SOLUTION:
+  - Return info structurée à ORCHESTRATOR
+  - ORCHESTRATOR update .build/context.md avec ces infos
+
+  Format return:
+  {{
+    "routes": [...],
+    "components": [...],
+    "models": [...],
+    "summary": "courte description"
+  }}
+
+  ⚠️ STOP création fichier .md
+  """)
+```
+
+**Actions si violation:**
+1. **STOP** immédiatement (pas de création .md)
+2. Return info structurée à ORCHESTRATOR
+3. ORCHESTRATOR update .build/context.md
+4. Résultat: Info centralisée, zéro pollution
+
+---
+
 ## 📌 Résumé Règle d'Or
 
 **1 SEUL endroit documentation: `.build/`**
@@ -206,8 +262,21 @@ User: "oui" → Agent crée
 
 Si doute sur fichier → **Demander user AVANT créer**
 
+**Rappel chemins autorisés .md:**
+- `.build/context.md` (orchestrator uniquement)
+- `.build/timeline.md` (orchestrator uniquement)
+- `.build/tasks.md` (orchestrator uniquement)
+- `.build/issues.md` (orchestrator uniquement)
+- `.build/decisions/*.md` (orchestrator uniquement)
+
+**Agents (executor, tester, research) = JAMAIS .md**
+
 ---
 
-**Version:** 1.0.0
-**Date:** 2025-01-10
+**Version:** 1.2.0
+**Date:** 2025-01-11
 **Application:** Obligatoire pour orchestrator + tous agents + tous skills
+**Changelog:**
+- v1.2.0: Suppression `.build/docs/` (context.md suffit)
+- v1.2.0: Agents doivent return info structurée (pas créer .md)
+- v1.1.0: Enforcement strict avec exemples violations

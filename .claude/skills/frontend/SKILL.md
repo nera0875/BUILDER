@@ -1602,6 +1602,331 @@ export function ClientDashboard({ tasks }) {
 
 ---
 
+## Patterns Sécurité Obligatoires (Anti-Bugs React/Next.js)
+
+> **Inspiré de :** React Error Handling Best Practices, Next.js Resilience Patterns
+
+### 1. Error Boundary (app/error.tsx) - OBLIGATOIRE
+
+**Créer TOUJOURS dans app/ principal ET chaque route majeure:**
+
+```tsx
+// app/error.tsx (Root Error Boundary)
+'use client'
+
+import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // Log error to monitoring service (Sentry, etc)
+    console.error('Error caught by boundary:', error)
+  }, [error])
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-destructive">Something went wrong</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {error.message || 'An unexpected error occurred'}
+          </p>
+          <Button onClick={reset} className="w-full">
+            Try again
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+```
+
+**Également créer pour routes importantes:**
+```
+app/dashboard/error.tsx
+app/tasks/error.tsx
+app/settings/error.tsx
+```
+
+**Principe:** Capture errors gracefully, évite white screen of death.
+
+---
+
+### 2. Loading States (app/loading.tsx) - OBLIGATOIRE
+
+**Créer dans app/ principal ET chaque route avec data fetching:**
+
+```tsx
+// app/loading.tsx (Root Loading)
+import { Skeleton } from '@/components/ui/skeleton'
+
+export default function Loading() {
+  return (
+    <div className="flex h-screen flex-col gap-4 p-6">
+      {/* Header Skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+      </div>
+
+      <div className="space-y-2">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+      </div>
+    </div>
+  )
+}
+```
+
+**Pour routes data-heavy:**
+```
+app/dashboard/loading.tsx
+app/tasks/loading.tsx
+```
+
+**Principe:** Évite layout shift, améliore UX pendant fetch.
+
+---
+
+### 3. useEffect Cleanup Pattern (Fetch Cancellation)
+
+**TOUJOURS ajouter AbortController pour fetch dans useEffect:**
+
+```tsx
+'use client'
+
+import { useEffect, useState } from 'react'
+
+export function Component() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    const abortController = new AbortController()
+
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/data', {
+          signal: abortController.signal  // ✅ Cleanup
+        })
+        const json = await res.json()
+        setData(json)
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log('Fetch cancelled')  // ✅ Normal
+        } else {
+          console.error('Fetch error:', error)
+        }
+      }
+    }
+
+    fetchData()
+
+    return () => {
+      abortController.abort()  // ✅ Cleanup on unmount
+    }
+  }, [])
+
+  return <div>{data ? JSON.stringify(data) : 'Loading...'}</div>
+}
+```
+
+**Principe:** Évite memory leaks, race conditions, setState after unmount.
+
+---
+
+### 4. Type-Safe Routes (Centralisé)
+
+**Créer lib/routes.ts pour éviter typos navigation:**
+
+```typescript
+// lib/routes.ts
+export const ROUTES = {
+  HOME: '/',
+  DASHBOARD: '/dashboard',
+  TASKS: '/tasks',
+  STATS: '/stats',
+  SETTINGS: '/settings',
+  API: {
+    TASKS: '/api/tasks',
+    TIME_ENTRIES: '/api/time-entries',
+    STATS: '/api/stats',
+  }
+} as const
+
+export type RouteKey = keyof typeof ROUTES
+```
+
+**Usage dans components:**
+```tsx
+import Link from 'next/link'
+import { ROUTES } from '@/lib/routes'
+
+export function Sidebar() {
+  return (
+    <nav>
+      <Link href={ROUTES.DASHBOARD}>Dashboard</Link>
+      <Link href={ROUTES.TASKS}>Tasks</Link>
+      <Link href={ROUTES.STATS}>Stats</Link>
+    </nav>
+  )
+}
+```
+
+**Principe:** 1 source de vérité, autocomplete, zero typo errors.
+
+---
+
+### 5. API Error Handling (Retry Logic)
+
+**Améliorer lib/api-client.ts avec retry:**
+
+```typescript
+// lib/api-client.ts (enhanced)
+async function apiCallWithRetry<T>(
+  endpoint: string,
+  options?: RequestInit,
+  retries = 3
+): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        ...options,
+      })
+
+      if (!response.ok) {
+        const error = (await response.json()) as ApiError
+        throw new Error(error.error || `API error: ${response.status}`)
+      }
+
+      return response.json()
+    } catch (error) {
+      if (i === retries - 1) throw error  // Last retry failed
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)))  // Exponential backoff
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
+```
+
+**Principe:** Résistance aux network glitches, meilleure UX.
+
+---
+
+### 6. Hydration Safe Pattern (isMounted)
+
+**SI besoin de window/document/Date dans render:**
+
+```tsx
+'use client'
+
+import { useEffect, useState } from 'react'
+
+export function Component() {
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)  // ✅ After hydration
+  }, [])
+
+  if (!isMounted) return null  // ✅ Évite hydration mismatch
+
+  return (
+    <div>
+      {/* Maintenant safe d'utiliser window/document/Date */}
+      {new Date().toISOString()}
+      {window.innerWidth}
+    </div>
+  )
+}
+```
+
+**Principe:** Évite "Hydration failed" errors.
+
+---
+
+### 7. Placeholder Pages Pattern
+
+**SI page pas encore implémentée, créer placeholder FUNCTIONAL:**
+
+```tsx
+// app/tasks/page.tsx (placeholder safe)
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { ROUTES } from '@/lib/routes'
+
+export default function TasksPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Tasks Page</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This page is under construction.
+          </p>
+          <Button asChild className="w-full">
+            <Link href={ROUTES.HOME}>Back to Dashboard</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+```
+
+**❌ JAMAIS créer page vide qui cause RSC errors:**
+```tsx
+// ❌ INTERDIT - Cause navigation errors
+export default function TasksPage() {
+  return <div>Coming soon</div>  // Trop minimal, peut causer errors
+}
+```
+
+**Principe:** Placeholders doivent être functional, pas juste text.
+
+---
+
+### Checklist Sécurité (OBLIGATOIRE avant livrer feature)
+
+**Vérifier TOUJOURS:**
+
+- [ ] `app/error.tsx` créé (Root Error Boundary)
+- [ ] `app/loading.tsx` créé (Root Loading State)
+- [ ] Routes majeures ont error.tsx si data-heavy
+- [ ] Routes majeures ont loading.tsx si async data
+- [ ] `lib/routes.ts` existe et utilisé partout
+- [ ] Fetch dans useEffect utilise AbortController
+- [ ] API client a retry logic (optionnel mais recommandé)
+- [ ] Pas de window/document sans isMounted pattern
+- [ ] Placeholder pages sont functional (Card + Button back)
+
+**Principe:** Prevention > Debugging. Ces patterns éliminent 90% bugs runtime.
+
+---
+
 ## Conventions Non-Negotiables
 
 1. **1 seul globals.css** (Tailwind directives)
@@ -1612,8 +1937,51 @@ export function ClientDashboard({ tasks }) {
 6. **z-index hierarchy stricte** (50 modal, 40 dropdown, etc)
 7. **Server Component par défaut** (Client opt-in)
 8. **Paths alias `@/*`** (tsconfig configuré)
+9. **JAMAIS créer fichiers .md** (interdiction absolue)
+10. **Error Boundaries + Loading States** (OBLIGATOIRE)
+11. **lib/routes.ts centralisé** (type-safe navigation)
+12. **AbortController dans fetch** (cleanup proper)
 
 **Cette architecture = OBLIGATOIRE. Toute déviation = bug garanti.**
+
+---
+
+## ❌ INTERDICTIONS DOCUMENTATION
+
+**EXECUTOR (frontend skill) ne doit JAMAIS:**
+
+1. ❌ Créer fichiers .md (API_ROUTES.md, FRONTEND_README.md, QUICK_START.md, etc)
+2. ❌ Créer documentation (même dans .build/)
+3. ❌ Expliquer son travail dans fichiers
+
+**✅ À LA PLACE:**
+
+**Return info structurée à ORCHESTRATOR après feature complétée:**
+
+```json
+{
+  "pages_created": [
+    "app/page.tsx",
+    "app/dashboard/page.tsx"
+  ],
+  "components_created": [
+    "components/TaskList.tsx",
+    "components/StatsCard.tsx"
+  ],
+  "components_reused": [
+    "@/components/ui/button",
+    "@/components/ui/card"
+  ],
+  "summary": "Dashboard avec liste tâches + stats cards + dark mode"
+}
+```
+
+**ORCHESTRATOR utilise return pour:**
+- Update `.build/context.md` (section Components)
+- Append `.build/timeline.md` (historique feature)
+
+**Principe:** 1 seul responsable documentation = ORCHESTRATOR
+**Avantage:** Syntaxe uniforme, pas de duplication, info centralisée
 
 ---
 
@@ -1626,6 +1994,9 @@ export function ClientDashboard({ tasks }) {
 
 ---
 
-**Version**: 1.0.0
-**Last updated**: 2025-01-10
+**Version**: 1.2.0
+**Last updated**: 2025-01-11
 **Maintained by**: EXECUTOR agent
+**Changelog**:
+- v1.2.0: Ajout patterns sécurité obligatoires (Error Boundaries, Loading States, AbortController, lib/routes.ts, placeholder pages functional)
+- v1.1.0: Ajout interdiction création .md (return info structurée à orchestrator)

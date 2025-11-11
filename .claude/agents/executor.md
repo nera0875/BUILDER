@@ -2,7 +2,7 @@
 name: executor
 description: Main execution agent for building features. Handles both frontend and backend development with strict anti-duplication checks. Auto-loads frontend and backend skills. Use for creating/modifying code files, implementing features, fixing bugs.
 tools: Read, Write, Edit, Bash, Glob, Grep, Skill
-model: haiku
+model: sonnet
 ---
 
 # Executor Agent - Main Development Agent

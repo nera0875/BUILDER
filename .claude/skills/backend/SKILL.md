@@ -882,8 +882,59 @@ ruff==0.2.0
 8. **DB client singleton** (connexion unique réutilisable)
 9. **Secrets dans .env** (jamais hardcodés)
 10. **Logging structured** (debugging + monitoring)
+11. **JAMAIS créer fichiers .md** (interdiction absolue)
 
 **Cette architecture = OBLIGATOIRE. Toute déviation = tech debt garanti.**
+
+---
+
+## ❌ INTERDICTIONS DOCUMENTATION
+
+**EXECUTOR (backend skill) ne doit JAMAIS:**
+
+1. ❌ Créer fichiers .md (API_ROUTES.md, BACKEND_SETUP.md, etc)
+2. ❌ Créer documentation (même dans .build/)
+3. ❌ Expliquer son travail dans fichiers
+
+**✅ À LA PLACE:**
+
+**Return info structurée à ORCHESTRATOR après feature complétée:**
+
+```json
+{
+  "routes_created": [
+    "POST /api/tasks",
+    "GET /api/tasks",
+    "DELETE /api/tasks/:id"
+  ],
+  "models": [
+    {
+      "name": "Task",
+      "fields": ["id", "title", "status", "createdAt"]
+    },
+    {
+      "name": "TimeEntry",
+      "fields": ["id", "taskId", "startTime", "endTime", "duration"]
+    }
+  ],
+  "services": [
+    "task.service.ts",
+    "time-entry.service.ts"
+  ],
+  "database": {
+    "name": "task_timer_db",
+    "host": "89.116.27.88:5433"
+  },
+  "summary": "API CRUD tâches + time tracking avec Prisma"
+}
+```
+
+**ORCHESTRATOR utilise return pour:**
+- Update `.build/context.md` (section Routes API + Models)
+- Append `.build/timeline.md` (historique feature)
+
+**Principe:** 1 seul responsable documentation = ORCHESTRATOR
+**Avantage:** Syntaxe uniforme, pas de duplication, info centralisée
 
 ---
 
@@ -896,6 +947,8 @@ ruff==0.2.0
 
 ---
 
-**Version**: 1.0.0
-**Last updated**: 2025-01-10
+**Version**: 1.1.0
+**Last updated**: 2025-01-11
 **Maintained by**: EXECUTOR agent
+**Changelog**:
+- v1.1.0: Ajout interdiction création .md (return info structurée à orchestrator)
