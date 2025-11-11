@@ -504,11 +504,15 @@ ls components/ui/ && echo "✅ Base OK" || echo "❌ CLONE BASE FIRST"
 
 ### Phase 1: Anti-Duplication Check (OBLIGATOIRE)
 
+**⚡ OPTIMIZED: Grep RAG-Style (1-2 tool uses, 2s)**
+
 **1. ✅ Check si composant shadcn existe dans `components/ui/`**
 ```bash
-ls components/ui/button.tsx     # Existe? (OUI = 99% cas) → Réutilise
-ls components/ui/card.tsx       # Existe? (OUI = 99% cas) → Réutilise
-ls components/ui/dialog.tsx     # Existe? (OUI = 99% cas) → Réutilise
+Grep "export.*Button" components/ui/ --output files_with_matches
+→ components/ui/button.tsx (existe) → Réutilise
+
+Grep "export.*Card" components/ui/ --output files_with_matches
+→ components/ui/card.tsx (existe) → Réutilise
 ```
 
 **Rappel:** BUILDER/.stack/ contient **57 composants shadcn**.
@@ -516,8 +520,25 @@ Ne JAMAIS recréer si existe.
 
 **2. ✅ Check si composant custom existe dans `components/features/`**
 ```bash
-grep -r "StatsCard" components/features/  # Existe? → Réutilise
-grep -r "TaskCard" components/features/   # Existe? → Réutilise
+Grep "export (default )?(function |const )?StatsCard" components/features/ -i --output files_with_matches
+→ Si trouvé: components/features/dashboard/stats-card.tsx → Réutilise
+→ Si vide: Composant existe pas → Créer
+
+Grep "export.*TaskCard" components/features/ -i --output files_with_matches
+→ Check existence (1 tool use, 2s)
+```
+
+**❌ PAS ÇA (lent - 30+ tools):**
+```bash
+ls components/ui/*.tsx → Liste 57 fichiers
+Read button.tsx, Read card.tsx, Read dialog.tsx...
+→ 30+ tool uses, 25s
+```
+
+**✅ ÇA (rapide - 1-2 tools):**
+```bash
+Grep "export.*[ComponentName]" components/ --output files_with_matches
+→ 1 tool use, 2s
 ```
 
 ---
@@ -905,13 +926,18 @@ import { Button } from "shadcn-ui"; // N'existe pas
 
 ### Vérification AVANT ajout composant (WORKFLOW ANTI-DUPLICATION)
 
-**Phase 1: Check BUILDER/.stack/ (57 composants inclus)**
+**Phase 1: Check BUILDER/.stack/ (57 composants inclus) - GREP RAPIDE**
 
 ```bash
-# TOUJOURS vérifier dans base AVANT shadcn add
-ls components/ui/button.tsx         # Existe? (99% OUI si base clonée)
-ls components/ui/card.tsx           # Existe? (99% OUI si base clonée)
-ls components/ui/dialog.tsx         # Existe? (99% OUI si base clonée)
+# TOUJOURS vérifier dans base AVANT shadcn add (1 tool use, 2s)
+Grep "export.*Button" components/ui/button.tsx
+→ Existe? (99% OUI si base clonée)
+
+Grep "export.*Card" components/ui/card.tsx
+→ Existe? (99% OUI si base clonée)
+
+Grep "export.*Dialog" components/ui/dialog.tsx
+→ Existe? (99% OUI si base clonée)
 ```
 
 **Phase 2: Décision selon résultat**
