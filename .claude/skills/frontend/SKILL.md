@@ -74,19 +74,66 @@ BUILDER/.stack/
 - `tsconfig.json`, `next.config.ts`, `postcss.config.mjs`
 - `package.json` (dependencies optimisées)
 
-**Commande clone (détection auto path BUILDER):**
-```bash
-# Trouver BUILDER/.stack/
-BUILDER_STACK=$(find ~ -type d -name "BUILDER" 2>/dev/null | head -1)/.stack
+**Commande clone (EXACTE - copy-paste ready):**
 
-# Clone si trouvé
-if [ -d "$BUILDER_STACK" ]; then
-  cp -r "$BUILDER_STACK"/* ./
-  npm install
-else
-  echo "❌ BUILDER/.stack/ non trouvé - clone repo BUILDER d'abord"
+```bash
+# ÉTAPE 1: Trouver BUILDER/.stack/ (méthode fiable)
+# Cherche dans home directory
+BUILDER_DIR=$(find ~ -maxdepth 3 -type d -name "BUILDER" 2>/dev/null | head -1)
+
+# Si pas trouvé dans home, cherche partout (plus lent)
+if [ -z "$BUILDER_DIR" ]; then
+  BUILDER_DIR=$(find /home -maxdepth 4 -type d -name "BUILDER" 2>/dev/null | head -1)
 fi
+
+# Path .stack/
+BUILDER_STACK="$BUILDER_DIR/.stack"
+
+# ÉTAPE 2: Vérifier .stack/ existe
+if [ ! -d "$BUILDER_STACK" ]; then
+  echo "❌ BUILDER/.stack/ non trouvé"
+  echo ""
+  echo "Clone BUILDER repo d'abord:"
+  echo "  cd ~"
+  echo "  git clone https://github.com/nera0875/BUILDER.git"
+  echo ""
+  echo "Puis relance la commande"
+  exit 1
+fi
+
+# ÉTAPE 3: Clone base frontend
+echo "📦 Clone base frontend depuis $BUILDER_STACK"
+
+# Copy tous les fichiers ET dossiers (y compris hidden)
+cp -r "$BUILDER_STACK"/* . 2>/dev/null
+cp -r "$BUILDER_STACK"/.[!.]* . 2>/dev/null
+
+# ÉTAPE 4: Install dependencies
+echo "📥 Installation dependencies..."
+npm install
+
+echo "✅ Base frontend clonée (57 composants shadcn ready)"
 ```
+
+**Alternative si find échoue (fallback manuel):**
+
+```bash
+# Si commande automatique échoue, donner instructions user:
+echo "❌ Détection automatique échouée"
+echo ""
+echo "Clone manuellement:"
+echo ""
+echo "1. Localise BUILDER repo:"
+echo "   cd ~/BUILDER  # ou ton path"
+echo ""
+echo "2. Copy .stack/ vers projet:"
+echo "   cp -r ~/.../BUILDER/.stack/* /ton/projet/"
+echo ""
+echo "3. Install dependencies:"
+echo "   cd /ton/projet && npm install"
+```
+
+**Principe:** find limité à 3-4 depth max (performance). Si projet BUILDER bien placé (~/BUILDER ou ~/tools/BUILDER), détection auto fonctionne.
 
 **Exemple détection:**
 ```json
