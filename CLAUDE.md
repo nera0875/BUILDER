@@ -119,19 +119,6 @@ new-project task-timer
 # → Prêt pour développement
 ```
 
-**⚠️ ATTENTION: new-project = BASE VIDE uniquement**
-- ✅ Structure Next.js + shadcn components
-- ✅ npm install done
-- ❌ **PAS de features custom** (pas de routes spécifiques, pas de Prisma setup, pas de composants métier)
-
-**Usage recommandé:**
-- User tape `new-project [nom]` MANUELLEMENT dans terminal
-- **JAMAIS invoquer via Bash** si user demande features (utiliser EXECUTOR à la place)
-
-**Workflow correct si user demande "crée blog":**
-1. ❌ PAS: `Bash("new-project blog")` (crée juste base vide)
-2. ✅ OUI: Questions → display-plan → EXECUTOR crée features complètes
-
 ### 2. preview [nom]
 ```bash
 preview task-timer
@@ -238,7 +225,60 @@ AskUserQuestion({
 
 ---
 
-### PHASE 1: Création Architecture Mermaid (si projet complexe)
+### PHASE 1: Affichage Plan Graphique (OBLIGATOIRE)
+
+**APRÈS user a répondu aux questions:**
+
+**Utiliser display-plan pour afficher plan dans terminal:**
+
+```bash
+Bash("display-plan '[nom-projet]' \
+  '[Stack1+Stack2+Stack3]' \
+  '[route1 - description]' \
+  '[route2 - description]' \
+  '[route3 - description]'")
+```
+
+**Exemple concret:**
+```bash
+display-plan "simple-blog" \
+  "Next.js 16+Prisma ORM+PostgreSQL+Tailwind v4" \
+  "/blog - Liste articles" \
+  "/blog/[slug] - Détail article" \
+  "/new - Créer article" \
+  "/edit/[slug] - Éditer article"
+```
+
+**Output dans terminal (avec couleurs + box drawing):**
+```
+╔═══════════════════════════════════════════════════════════╗
+║  📋 PLAN CRÉATION: simple-blog                            ║
+╠═══════════════════════════════════════════════════════════╣
+║  🎯 STACK TECHNIQUE                                       ║
+║     • Next.js 16                                          ║
+║     • Prisma ORM                                          ║
+║     • PostgreSQL                                          ║
+║     • Tailwind v4                                         ║
+║  🗂️  ROUTES PRINCIPALES                                   ║
+║     • /blog - Liste articles                              ║
+║     • /blog/[slug] - Détail article                       ║
+║     • /new - Créer article                                ║
+║     • /edit/[slug] - Éditer article                       ║
+╚═══════════════════════════════════════════════════════════╝
+
+Valide pour continuer? [y/n]:
+```
+
+**User tape:**
+- `y` → display-plan exit 0 → Je lance EXECUTOR
+- `n` → display-plan exit 1 → Je demande modifications
+
+**Principe:** Beautiful terminal output = Better UX. User voit plan complet avant création.
+(Inspiration: Vercel CLI, Stripe CLI - always show what will happen)
+
+---
+
+### PHASE 2: Création Architecture Mermaid (optionnel si complexe)
 
 **SI projet full-stack OU >3 features:**
 
