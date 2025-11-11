@@ -84,6 +84,83 @@ STEP 4: SI duplication détectée
   → Attendre décision
 ```
 
+**⚡ OPTIMIZATION: Anti-Dup Rapide avec Grep (RAG-style)**
+
+**❌ PAS ÇA (lent - 30+ tool uses):**
+```
+1. Glob components/ui/*.tsx → Liste 57 fichiers
+2. Read components/ui/button.tsx
+3. Read components/ui/card.tsx
+... x57 Read files
+→ Total: 30+ tool uses, 25-30s
+```
+
+**✅ ÇA (rapide - 1-2 tool uses):**
+```
+1. Grep "export.*Card" components/ --output files_with_matches
+   → Return: components/ui/card.tsx
+   → Existe? Oui → Import
+   → 1 tool use, 2s
+
+2. Grep "export.*StatsCard" components/features/
+   → Return: (no matches)
+   → Pas trouvé → Créer
+   → 1 tool use, 2s
+```
+
+**Pattern RAG intelligent:**
+```
+Besoin de vérifier si "PostCard" existe?
+
+→ Grep "export (default )?(function |const )?PostCard" components/ -i
+  Output: files_with_matches
+
+SI trouvé → Import path retourné
+SI vide → Composant existe pas, créer
+```
+
+**Workflow anti-dup optimisé:**
+```
+STEP 1: Read .build/context.md (1 tool)
+  → Liste composants connus
+
+STEP 2: Grep search rapide (1-2 tools max)
+  → Grep "export.*[NomComposant]" components/
+  → Grep "class [NomService]" services/
+  → Return files_with_matches
+
+STEP 3: Decision immédiate
+  → Trouvé? Import
+  → Pas trouvé? Créer selon convention
+
+Total: 3-4 tool uses, 5-10s (vs 30+ tools, 25-30s)
+```
+
+**Exemples concrets:**
+
+**Check Button shadcn existe:**
+```bash
+Grep "export.*Button" components/ui/ --output files_with_matches
+→ components/ui/button.tsx
+→ Import depuis @/components/ui/button
+```
+
+**Check TaskService existe:**
+```bash
+Grep "class TaskService" services/ --output files_with_matches
+→ services/task_service.py
+→ Import et réutilise
+```
+
+**Check PostCard custom existe:**
+```bash
+Grep "export.*PostCard" components/features/ --output files_with_matches
+→ (no matches)
+→ Créer components/features/blog/post-card.tsx
+```
+
+**Règle:** 1-2 Grep ciblés = RAG ultra rapide. Pas besoin Read 57 fichiers.
+
 **Exemples concrets:**
 
 **Exemple 1: Créer bouton**

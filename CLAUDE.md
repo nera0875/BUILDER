@@ -941,20 +941,120 @@ Après toutes vagues:
 - Parallélisé (3 vagues de 5): 3 x 30s = **1.5 minutes**
 - **Gain: 5x plus rapide**
 
+---
+
+## Speed Optimization (Background Commands + Precise Prompts)
+
+**Tests effectués:**
+- npm install séquentiel: 40s bloqué
+- npm install background: 0s bloqué (continue autre chose)
+- Agent avec prompt vague: 25-30s (36+ tool uses pour anti-dup)
+- Agent avec prompt précis: 5-10s (2-3 tool uses)
+
+### Stratégie Background Commands
+
+**Commandes longues à lancer en background:**
+- npm install (40s)
+- npm run build (20-30s)
+- git clone large repos
+- database migrations
+- Tout ce qui fait "wait"
+
+**Workflow optimisé nouveau projet:**
+
+**Phase 0 (MOI): Setup Background (0s wait)**
+```bash
+Bash("mkdir projet && cp .stack/ && npm install", run_in_background: true)
+→ Return immédiat, npm tourne en background
+```
+
+**Phase 1 (5-10 agents parallèles): Fichiers sans dépendances npm**
+Pendant que npm install tourne:
+```javascript
+Task(executor, "Crée types.ts")      // 5s
+Task(executor, "Crée constants.ts")  // 5s
+Task(executor, "Crée utils purs")    // 5s
+Task(executor, "Crée config files")  // 5s
+Task(executor, "Crée .env, README")  // 5s
+→ Total: 5s (tous parallèles)
+```
+
+**Phase 2 (MOI): Check npm done**
+```javascript
+BashOutput(npm_id)
+→ Si status: completed → Phase 3
+→ Si running → Wait 5s → Re-check
+```
+
+**Phase 3 (5-10 agents parallèles): Fichiers avec imports**
+```javascript
+Task(executor, "Crée components shadcn")  // 10s
+Task(executor, "Crée pages")              // 10s
+→ Total: 10s (tous parallèles)
+```
+
+**Gain:**
+- Séquentiel: 40s npm + 15 x 15s files = **265s (4min 25s)**
+- Optimisé: 40s npm (background) + 5s phase1 + 10s phase3 = **55s**
+- **Gain: 5x plus rapide! 🚀**
+
+### Stratégie Prompts Ultra-Précis
+
+**❌ Prompt vague (lent):**
+```
+Task(executor, haiku, "Charge Skill('frontend')
+Crée components/post-card.tsx")
+```
+→ Agent scan TOUS composants (36+ tool uses, 25-30s)
+
+**✅ Prompt ultra-précis (rapide):**
+```
+Task(executor, haiku, "Path: /home/pilote/projet/secondaire/blog
+Stack: Next.js 16, shadcn ready
+
+Crée components/post-card.tsx:
+- 'use client'
+- Import: Card, CardHeader from @/components/ui (shadcn présent)
+- Import: Post from @/lib/types (existe déjà)
+- Props: {post: Post}
+- Style: Tailwind utilities
+
+SKIP anti-duplication scan (orchestrator a déjà vérifié)
+
+Return: ✓ post-card.tsx")
+```
+→ Agent créé direct (2-3 tool uses, 5-10s)
+
+**Règles prompts optimisés:**
+1. ✅ Path complet absolu
+2. ✅ Imports exacts avec chemins confirmés
+3. ✅ Props/types détaillés
+4. ✅ "SKIP anti-dup scan" si déjà vérifié par orchestrator
+5. ✅ "Return bref: ✓ [filename]"
+6. ❌ Pas de "Charge Skill()" dans prompt (agent le fait auto)
+7. ❌ Pas de prompts vagues ("crée composant blog")
+
+**Gain:**
+- Prompt vague: 25-30s par agent
+- Prompt précis: 5-10s par agent
+- **Gain: 3x plus rapide par fichier**
+
 ### Token Optimization Intégrée
 
 **MOI (orchestrator):**
 - Pas de Skill() charge → Économie 5000+ tokens par skill
 - Scan rapide (.build/ + Glob) → 1000 tokens max
 - Instructions précises → EXECUTOR sait exactement quoi faire
+- Background commands → Pas de wait bloquant
 
 **EXECUTOR (chacun):**
 - Charge skills LUI-MÊME selon besoin
-- Anti-duplication check intégré
-- Return résultat bref
+- Skip anti-dup si orchestrator confirme
+- Return résultat bref (✓ filename)
+- Max 2-5 tool uses par tâche simple
 
-**Principe:** Orchestration intelligente, exécution parallèle, zero duplication.
-(Google MapReduce, Netflix Microservices, Vercel Edge Functions)
+**Principe:** Orchestration intelligente, background parallèle, prompts laser-précis, zero duplication.
+(Google MapReduce, Netflix Microservices, Vercel Edge Functions, Unix Philosophy: "Do one thing well")
 
 ---
 
