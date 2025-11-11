@@ -59,21 +59,104 @@
 
 ---
 
-## Nouveau Projet - Setup Auto + specs.md
+## Nouveau Projet - Questions & Setup (OBLIGATOIRE)
 
-**Quand user démarre nouveau projet (ex: projet/primaire/dashboard):**
+**PATH OBLIGATOIRE:** `projet/secondaire/[NOM-PROJET]/`
 
-### STEP 1: Détection
+**Quand user demande créer projet:**
+
+### PHASE 0: Questions Clarification (AVANT TOUT CODE)
+
+**TOUJOURS demander ces informations AVANT créer quoi que ce soit:**
+
 ```
-User: "Crée dashboard pomodoro PostgreSQL"
+User: "Crée dashboard gestion tâches"
 
+MOI (orchestrator) OBLIGATOIRE:
+
+📋 Questions avant conception:
+
+1️⃣ **Nom du projet?**
+   (Exemple: "ticktick-clone", "task-manager", "dashboard-pro")
+
+2️⃣ **Features principales?**
+   (Liste 3-5 features clés)
+
+3️⃣ **Stack préférée?**
+   - Frontend: Next.js (défaut) / React / autre?
+   - Backend: Prisma + PostgreSQL (défaut) / FastAPI / autre?
+
+4️⃣ **Authentification nécessaire?**
+   - Oui (NextAuth, JWT) / Non
+
+5️⃣ **Autres contraintes?**
+   - Dark mode? Real-time? Mobile-first? etc.
+```
+
+**User répond aux questions**
+
+---
+
+### PHASE 1: Création Architecture Mermaid (si projet complexe)
+
+**SI projet full-stack OU >3 features:**
+
+```
 MOI (orchestrator):
-1. Check working directory a .build/?
-   → Non trouvé
-2. Conclusion: Nouveau projet
+
+🎨 Architecture proposée:
+
+[Génère Mermaid diagram montrant:]
+- Stack frontend/backend
+- Routes principales
+- Data models
+- Flow auth (si applicable)
+
+User, cette architecture te convient? (valide/modifie)
 ```
 
-### STEP 2: Créer .build/ structure
+**User valide OU demande modifications**
+
+**SI modifications:** Ajuster Mermaid → Re-valider
+
+---
+
+### PHASE 2: Confirmation Path & Go
+
+**APRÈS validation architecture:**
+
+```
+MOI (orchestrator):
+
+✅ Récapitulatif:
+- Nom: [nom-projet]
+- Path: projet/secondaire/[nom-projet]/
+- Stack: [stack détectée]
+- Features: [liste features]
+
+Je crée le projet maintenant?
+```
+
+**User:** "valide" / "go" / "oui"
+
+**MOI:** Commence création
+
+---
+
+### PHASE 3: Détection & Setup
+
+```
+MOI (orchestrator):
+1. Check working directory
+   → Si pas dans projet/secondaire/ → cd projet/secondaire/
+2. mkdir [nom-projet]
+3. cd [nom-projet]
+4. Check .build/ existe?
+   → Non trouvé
+5. Conclusion: Nouveau projet → Setup
+```
+
+### PHASE 4: Créer .build/ structure
 ```
 Silencieux (pas demander user):
 1. Write .build/context.md (template vide initial)
