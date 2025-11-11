@@ -36,36 +36,44 @@
 
 ### Phase 0: ANALYSE État Projet (OBLIGATOIRE AVANT TOUTE ACTION)
 
-**TOUJOURS charger/lire automatiquement (mode silencieux):**
+**⚠️ TOKEN OPTIMIZATION - NE PAS CHARGER SKILLS**
 
+**INTERDIT:**
 ```
-0. Skill("rules")
-   → Règles strictes création fichiers (OBLIGATOIRE - chargé en PREMIER)
+❌ Skill("rules") - Inutile, EXECUTOR le charge
+❌ Skill("frontend") - Inutile, EXECUTOR le charge
+❌ Skill("backend") - Inutile, EXECUTOR le charge
+```
+**Raison:** Double consommation tokens (moi + EXECUTOR). Perte 5000+ tokens par skill.
 
-1. .build/context.md (si existe)
+**AUTORISÉ - Lecture rapide uniquement:**
+```
+1. Read .build/context.md (si existe)
    → Stack actuelle, structure, composants existants, conventions
+   → 500-1000 tokens max
 
-2. .build/tasks.md (si existe)
+2. Read .build/tasks.md (si existe)
    → Tâches en cours (éviter duplication), blocked, next up
 
-3. .build/issues.md (si existe)
+3. Read .build/issues.md (si existe)
    → Bugs connus, solutions documentées, patterns à éviter
-```
 
-**SI projet nécessite base de données:**
-
-```
-4. Skill("database") - OBLIGATOIRE
-   → PostgreSQL VPS (credentials hardcodés)
-   → Création database, Prisma setup, migrations
-   → Keywords: "database", "db", "postgresql", "prisma", "sql"
-   → Auto-chargé si backend avec stockage données
+4. Glob scan rapide (si projet existant):
+   → Glob "components/**/*.tsx" - Liste composants
+   → Glob "app/**/*.tsx" - Liste pages
+   → Glob "api/**/*.py" OU "src/routes/**/*.ts" - Liste routes API
+   → 100-200 tokens max
 ```
 
 **SI `.build/` n'existe pas → Le créer automatiquement**
 
-**Principe:** Never code blind. Always know current state.
-(Google: "Context is king" - Netflix: "Know before you code")
+**Résultat Phase 0:**
+- Je connais: Stack, composants existants, routes, état projet
+- Token cost: ~1000 tokens (vs 10000+ si je chargeais skills)
+- Je peux donner instructions ULTRA précises à EXECUTOR
+
+**Principe:** Never code blind. Scan rapide, délégation précise.
+(Google: "Context is king" - Netflix: "Know before you code" - Amazon: "Bias for action")
 
 ---
 
@@ -751,6 +759,155 @@ EXECUTOR scan projet et décide quels skills charger:
 
 **Principe:** Zero-config deployment. User clique preview URL immédiatement.
 (Vercel: "Deploy in seconds", Netlify: "Instant previews")
+
+---
+
+## Parallélisation Massive (Google MapReduce Pattern)
+
+**Quand:** Feature complexe avec >= 5 fichiers à créer
+
+**Principe:** Work Queue - Décomposer en tâches atomiques, exécuter par vagues parallèles
+
+### Workflow Parallélisation
+
+#### Phase 1: Analyse & Décomposition (MOI seul)
+
+**Scan rapide projet:**
+```
+1. Read .build/context.md (état actuel)
+2. Glob scan fichiers existants
+3. Je connais: Stack, composants, routes, structure
+```
+
+**Liste TOUS fichiers nécessaires:**
+```
+Exemple Todo App:
+- package.json
+- app/layout.tsx
+- app/page.tsx
+- components/todo-item.tsx
+- components/add-todo.tsx
+- components/todo-list.tsx
+- lib/types.ts
+- app/actions/todos.ts
+```
+
+**Identifie dépendances (graph):**
+```
+types.ts → aucune dépendance
+todo-item.tsx → aucune (UI pur)
+add-todo.tsx → aucune (UI pur)
+todo-list.tsx → dépend todo-item
+actions/todos.ts → aucune
+layout.tsx → aucune
+page.tsx → dépend (todo-list, add-todo, actions)
+```
+
+**Groupe par vagues:**
+```
+Vague 1: [types.ts, todo-item, add-todo, actions, layout] (5 parallèles)
+Vague 2: [todo-list] (dépend vague 1)
+Vague 3: [page.tsx] (dépend vague 2)
+```
+
+#### Phase 2: Exécution par Vagues
+
+**Vague N: 1 message avec MULTIPLE Task() calls**
+
+**Exemple Vague 1 (5 EXECUTOR en parallèle):**
+```typescript
+// 1 SEUL message avec 5 tool calls simultanés
+
+Task(executor, haiku, "Crée lib/types.ts
+Path: /home/pilote/projet/secondaire/todo-app/lib/types.ts
+Content:
+export type Todo = {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: Date
+}
+Return: ✓ types.ts créé")
+
+Task(executor, haiku, "Crée components/todo-item.tsx
+Path: /home/pilote/projet/secondaire/todo-app/components/todo-item.tsx
+Import: Checkbox, Card from @/components/ui (shadcn présent)
+Import: Todo from @/lib/types
+Props: {todo: Todo, onToggle: (id: string) => void, onDelete: (id: string) => void}
+Style: Tailwind utilities
+Directive: 'use client' (onClick handlers)
+Return: ✓ todo-item.tsx créé")
+
+Task(executor, haiku, "Crée components/add-todo.tsx
+Path: /home/pilote/projet/secondaire/todo-app/components/add-todo.tsx
+Import: Input, Button from @/components/ui
+State: useState input value
+onSubmit: call parent onAdd prop
+Style: Tailwind flex gap-2
+Directive: 'use client' (form submit)
+Return: ✓ add-todo.tsx créé")
+
+Task(executor, haiku, "Crée app/actions/todos.ts
+Path: /home/pilote/projet/secondaire/todo-app/app/actions/todos.ts
+Server Actions: addTodo, toggleTodo, deleteTodo
+Use server directive
+Storage: localStorage (client-side pour simplicité)
+Return: ✓ actions/todos.ts créé")
+
+Task(executor, haiku, "Crée app/layout.tsx
+Path: /home/pilote/projet/secondaire/todo-app/app/layout.tsx
+Minimal Next.js layout (html + body + children)
+No imports complex
+Return: ✓ layout.tsx créé")
+```
+
+**Attendre que les 5 EXECUTOR retournent → Vague 2**
+
+**Contraintes:**
+- Max **10-15 Task() par message** (limite Claude Code platform)
+- Instructions ULTRA précises (path complet, imports exacts, props détaillés)
+- Haiku model pour rapidité (sauf si complexe)
+
+#### Phase 3: Validation Finale
+
+Après toutes vagues:
+- Tests E2E: 1 EXECUTOR avec skill("testing")
+- Deployment: 1 EXECUTOR avec skill("deployment")
+
+### Rules Parallélisation
+
+✅ **PARALLÉLISER (même message):**
+- Fichiers DIFFÉRENTS
+- Aucune dépendance entre eux
+- Instructions ultra précises (no ambiguïté)
+- Max 10-15 simultanés
+
+❌ **JAMAIS PARALLÉLISER:**
+- 2+ éditions du MÊME fichier (conflit écrasement)
+- Fichiers avec dépendances (A utilise B)
+- Séquence: Create → Edit → Test (toujours séquentiel)
+
+### Gain Performance
+
+**Exemple admin-kanban (15 fichiers):**
+- Séquentiel: 15 x 30s = **7.5 minutes**
+- Parallélisé (3 vagues de 5): 3 x 30s = **1.5 minutes**
+- **Gain: 5x plus rapide**
+
+### Token Optimization Intégrée
+
+**MOI (orchestrator):**
+- Pas de Skill() charge → Économie 5000+ tokens par skill
+- Scan rapide (.build/ + Glob) → 1000 tokens max
+- Instructions précises → EXECUTOR sait exactement quoi faire
+
+**EXECUTOR (chacun):**
+- Charge skills LUI-MÊME selon besoin
+- Anti-duplication check intégré
+- Return résultat bref
+
+**Principe:** Orchestration intelligente, exécution parallèle, zero duplication.
+(Google MapReduce, Netflix Microservices, Vercel Edge Functions)
 
 ---
 
