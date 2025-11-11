@@ -229,42 +229,63 @@ AskUserQuestion({
 
 **APRÈS user a répondu aux questions:**
 
-**Utiliser display-plan pour afficher plan dans terminal:**
+**Utiliser display-plan pour afficher plan USER-FRIENDLY dans terminal:**
+
+**IMPORTANT:** Penser FEATURES utilisateur, pas routes techniques!
 
 ```bash
 Bash("display-plan '[nom-projet]' \
-  '[Stack1+Stack2+Stack3]' \
-  '[route1 - description]' \
-  '[route2 - description]' \
-  '[route3 - description]'")
+  --feature '[Ce que user peut faire 1]' \
+  --feature '[Ce que user peut faire 2]' \
+  --feature '[Ce que user peut faire 3]' \
+  --access '[Qui peut accéder]' \
+  --data '[Où les données sont sauvegardées]' \
+  --design '[Look & feel 1]' \
+  --design '[Look & feel 2]' \
+  --stack '[Stack technique résumée]'")
 ```
 
 **Exemple concret:**
 ```bash
 display-plan "simple-blog" \
-  "Next.js 16+Prisma ORM+PostgreSQL+Tailwind v4" \
-  "/blog - Liste articles" \
-  "/blog/[slug] - Détail article" \
-  "/new - Créer article" \
-  "/edit/[slug] - Éditer article"
+  --feature "Afficher liste des articles sur page d'accueil" \
+  --feature "Lire un article complet" \
+  --feature "Créer un nouvel article" \
+  --feature "Modifier un article existant" \
+  --feature "Supprimer un article" \
+  --access "Blog public (pas de login nécessaire)" \
+  --data "Articles stockés dans base de données avec backup auto" \
+  --design "Interface moderne et propre" \
+  --design "Mode sombre/clair inclus" \
+  --design "Responsive (mobile + desktop)" \
+  --stack "Next.js + PostgreSQL + shadcn/ui"
 ```
 
 **Output dans terminal (avec couleurs + box drawing):**
 ```
-╔═══════════════════════════════════════════════════════════╗
-║  📋 PLAN CRÉATION: simple-blog                            ║
-╠═══════════════════════════════════════════════════════════╣
-║  🎯 STACK TECHNIQUE                                       ║
-║     • Next.js 16                                          ║
-║     • Prisma ORM                                          ║
-║     • PostgreSQL                                          ║
-║     • Tailwind v4                                         ║
-║  🗂️  ROUTES PRINCIPALES                                   ║
-║     • /blog - Liste articles                              ║
-║     • /blog/[slug] - Détail article                       ║
-║     • /new - Créer article                                ║
-║     • /edit/[slug] - Éditer article                       ║
-╚═══════════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════╗
+║ 📋 PLAN: simple-blog                                        ║
+╠═════════════════════════════════════════════════════════════╣
+║ 🎯 FONCTIONNALITÉS                                          ║
+║   ✅ Afficher liste des articles sur page d'accueil         ║
+║   ✅ Lire un article complet                                ║
+║   ✅ Créer un nouvel article                                ║
+║   ✅ Modifier un article existant                           ║
+║   ✅ Supprimer un article                                   ║
+║ 👤 ACCÈS                                                    ║
+║   • Blog public (pas de login nécessaire)                   ║
+║ 💾 DONNÉES                                                  ║
+║   • Articles stockés dans base de données avec backup auto  ║
+║ 📱 DESIGN                                                   ║
+║   • Interface moderne et propre                             ║
+║   • Mode sombre/clair inclus                                ║
+║   • Responsive (mobile + desktop)                           ║
+╠═════════════════════════════════════════════════════════════╣
+║ ⚙️  Détails techniques: Next.js + PostgreSQL + shadcn/ui   ║
+╚═════════════════════════════════════════════════════════════╝
+
+✅ Ce plan te convient?
+❓ Besoin d'ajustements? (je peux poser d'autres questions)
 
 Valide pour continuer? [y/n]:
 ```

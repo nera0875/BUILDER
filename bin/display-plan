@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Display Plan - Pretty terminal output for project plans
+# Display Plan V2 - User-friendly format (non-technical)
+# Shows WHAT the app does, not HOW it's coded
 
 # Colors
 RED='\033[0;31m'
@@ -11,6 +12,7 @@ MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 BOLD='\033[1m'
+DIM='\033[2m'
 RESET='\033[0m'
 
 # Box drawing
@@ -39,11 +41,26 @@ print_header() {
 }
 
 print_section() {
-    echo -e "${CYAN}${VERTICAL}${RESET} ${YELLOW}$1${RESET}"
+    echo -e "${CYAN}${VERTICAL}${RESET} ${BOLD}${YELLOW}$1${RESET}"
+}
+
+print_feature() {
+    printf "${CYAN}${VERTICAL}${RESET}   ${GREEN}✅${RESET} %-$((WIDTH-6))s ${CYAN}${VERTICAL}${RESET}\n" "$1"
 }
 
 print_item() {
-    printf "${CYAN}${VERTICAL}${RESET}   ${GREEN}•${RESET} %-$((WIDTH-5))s ${CYAN}${VERTICAL}${RESET}\n" "$1"
+    printf "${CYAN}${VERTICAL}${RESET}   ${BLUE}•${RESET} %-$((WIDTH-5))s ${CYAN}${VERTICAL}${RESET}\n" "$1"
+}
+
+print_tech() {
+    printf "${CYAN}${VERTICAL}${RESET} ${DIM}  $1${RESET}"
+    local padding=$((WIDTH - ${#1} - 3))
+    printf "%${padding}s" ""
+    echo -e "${CYAN}${VERTICAL}${RESET}"
+}
+
+print_separator() {
+    echo -e "${CYAN}${T_LEFT}$(print_line $HORIZONTAL)${T_RIGHT}${RESET}"
 }
 
 print_footer() {
@@ -54,43 +71,103 @@ print_empty() {
     printf "${CYAN}${VERTICAL}${RESET} %-$((WIDTH-2))s ${CYAN}${VERTICAL}${RESET}\n" ""
 }
 
-# Usage
-if [ "$1" == "--help" ] || [ -z "$1" ]; then
-    echo "Usage: display-plan <project-name> <stack> <route1> <route2> ..."
-    echo "Example: display-plan simple-blog 'Next.js+Prisma' '/blog' '/new'"
-    exit 0
-fi
-
+# Parse arguments (JSON-like input)
 PROJECT_NAME="$1"
-STACK="$2"
-shift 2
-ROUTES=("$@")
+shift
+
+FEATURES=()
+ACCESS=""
+DATA=""
+DESIGN=()
+STACK=""
+
+# Parse remaining arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --feature)
+            FEATURES+=("$2")
+            shift 2
+            ;;
+        --access)
+            ACCESS="$2"
+            shift 2
+            ;;
+        --data)
+            DATA="$2"
+            shift 2
+            ;;
+        --design)
+            DESIGN+=("$2")
+            shift 2
+            ;;
+        --stack)
+            STACK="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 # Display
 echo ""
 echo ""
-print_header "📋 PLAN CRÉATION: $PROJECT_NAME"
+print_header "📋 PLAN: $PROJECT_NAME"
 print_empty
-print_section "🎯 STACK TECHNIQUE"
-IFS='+' read -ra STACK_PARTS <<< "$STACK"
-for part in "${STACK_PARTS[@]}"; do
-    print_item "$part"
-done
-print_empty
-print_section "🗂️  ROUTES PRINCIPALES"
-for route in "${ROUTES[@]}"; do
-    print_item "$route"
-done
-print_empty
+
+# Features
+if [ ${#FEATURES[@]} -gt 0 ]; then
+    print_section "🎯 FONCTIONNALITÉS"
+    for feature in "${FEATURES[@]}"; do
+        print_feature "$feature"
+    done
+    print_empty
+fi
+
+# Access
+if [ -n "$ACCESS" ]; then
+    print_section "👤 ACCÈS"
+    print_item "$ACCESS"
+    print_empty
+fi
+
+# Data
+if [ -n "$DATA" ]; then
+    print_section "💾 DONNÉES"
+    print_item "$DATA"
+    print_empty
+fi
+
+# Design
+if [ ${#DESIGN[@]} -gt 0 ]; then
+    print_section "📱 DESIGN"
+    for item in "${DESIGN[@]}"; do
+        print_item "$item"
+    done
+    print_empty
+fi
+
+# Tech details (collapsed, for reference)
+if [ -n "$STACK" ]; then
+    print_separator
+    print_tech "⚙️  Détails techniques: $STACK"
+fi
+
 print_footer
 
+# Prompt
 echo ""
-read -p "$(echo -e ${GREEN}Valide pour continuer? [y/n]:${RESET} )" -n 1 -r
+echo -e "${GREEN}✅ Ce plan te convient?${RESET}"
+echo -e "${BLUE}❓ Besoin d'ajustements?${RESET} (je peux poser d'autres questions)"
+echo ""
+read -p "$(echo -e ${BOLD}Valide pour continuer? [y/n]:${RESET} )" -n 1 -r
 echo
+
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}✅ Création lancée!${RESET}"
     exit 0
 else
-    echo -e "${RED}❌ Annulé${RESET}"
+    echo -e "${YELLOW}⚠️  Annulé - demande des ajustements${RESET}"
     exit 1
 fi
