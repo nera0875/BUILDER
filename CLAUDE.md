@@ -32,6 +32,34 @@
 
 ---
 
+## System Credentials (Sécurisé)
+
+**Sudo Password Location:** `/opt/builder/.credentials`
+
+```bash
+# Usage quand sudo requis:
+SUDO_PASS=$(cat /opt/builder/.credentials | grep SUDO_PASSWORD | cut -d'=' -f2)
+echo "$SUDO_PASS" | sudo -S [commande]
+
+# Exemple: Ouvrir port firewall
+SUDO_PASS=$(cat /opt/builder/.credentials | grep SUDO_PASSWORD | cut -d'=' -f2)
+echo "$SUDO_PASS" | sudo -S ufw allow 8080/tcp
+```
+
+**Permissions fichier:**
+- Path: `/opt/builder/.credentials`
+- Owner: `pilote:pilote`
+- Permissions: `600` (read/write owner only)
+- **PAS versionné Git** (sécurité)
+
+**Quand utiliser:**
+- Ouvrir ports firewall (ufw/iptables)
+- Installer packages système (apt install)
+- Modifier configs système (/etc/)
+- Gérer services système (systemctl)
+
+---
+
 ## Workflow Auto (STRICT - Inspiré Google SRE)
 
 ### Phase 0: ANALYSE État Projet (OBLIGATOIRE AVANT TOUTE ACTION)
