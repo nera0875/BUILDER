@@ -147,47 +147,53 @@ new-project [nom-projet]
 
 **✅ QUESTIONS AUTORISÉES (fonctionnelles uniquement):**
 
+**OBLIGATOIRE: Utiliser AskUserQuestion tool pour menu interactif**
+
+```typescript
+// EXEMPLE: Dashboard gestion tâches
+AskUserQuestion({
+  questions: [
+    {
+      question: "Quelles fonctionnalités pour le dashboard?",
+      header: "Features",
+      multiSelect: true,  // User peut choisir plusieurs
+      options: [
+        {label: "CRUD tâches", description: "Créer/modifier/supprimer tâches"},
+        {label: "Timer/Pomodoro", description: "Tracking temps passé"},
+        {label: "Stats/Analytics", description: "Graphiques aujourd'hui/semaine/mois"},
+        {label: "Export CSV/PDF", description: "Exporter données"}
+      ]
+    },
+    {
+      question: "Authentification?",
+      header: "Auth",
+      multiSelect: false,  // Choix unique
+      options: [
+        {label: "Oui - NextAuth (email/password)", description: "Multi-utilisateurs avec login"},
+        {label: "Non - App publique", description: "Pas de login, solo"}
+      ]
+    },
+    {
+      question: "Base de données?",
+      header: "Database",
+      multiSelect: false,
+      options: [
+        {label: "PostgreSQL (Prisma)", description: "Je setup local PostgreSQL"},
+        {label: "J'ai déjà PostgreSQL", description: "Je fournirai DATABASE_URL"},
+        {label: "JSON local", description: "Pas de DB, fichiers JSON"}
+      ]
+    }
+  ]
+})
 ```
-User: "Crée dashboard gestion tâches"
 
-MOI (orchestrator) OBLIGATOIRE:
+**Avantages:**
+- ✅ User clique choix (pas taper réponses)
+- ✅ multiSelect: true pour features multiples
+- ✅ multiSelect: false pour choix unique
+- ✅ "Other" auto ajouté si user veut custom input
 
-📋 Clarification besoin:
-
-1️⃣ **Nom du projet?**
-   (Exemple: "task-manager", "time-tracker", "admin-dashboard")
-
-2️⃣ **Quelles fonctionnalités exactement?**
-   (Décris ce que l'app doit FAIRE, pas comment)
-
-   Exemples questions:
-   - CRUD tâches (créer, lire, modifier, supprimer)?
-   - Tracking temps passé sur tâches?
-   - Stats/analytics (aujourd'hui, semaine, mois)?
-   - Multi-utilisateurs ou solo?
-   - Export données (CSV, PDF)?
-   - Timer/Pomodoro?
-   - Catégories/tags?
-   - Priorités tâches?
-
-3️⃣ **Authentification?**
-   - Oui → NextAuth.js (email/password)
-   - Non → App publique
-
-4️⃣ **Base de données?** (si backend nécessaire)
-   - DATABASE_URL de votre PostgreSQL?
-   - Ou je setup local PostgreSQL?
-```
-
-**User répond (FONCTIONNALITÉS uniquement, pas technique)**
-
-**Exemple réponse attendue:**
-```
-1. time-master
-2. CRUD tâches + timer par tâche + stats hebdo + multi-users + export CSV
-3. Oui, auth email/password
-4. postgresql://user:pass@vps-ip:5432/timedb
-```
+**User répond via interface → Je reçois réponses structurées**
 
 ---
 
