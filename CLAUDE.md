@@ -119,6 +119,19 @@ new-project task-timer
 # → Prêt pour développement
 ```
 
+**⚠️ ATTENTION: new-project = BASE VIDE uniquement**
+- ✅ Structure Next.js + shadcn components
+- ✅ npm install done
+- ❌ **PAS de features custom** (pas de routes spécifiques, pas de Prisma setup, pas de composants métier)
+
+**Usage recommandé:**
+- User tape `new-project [nom]` MANUELLEMENT dans terminal
+- **JAMAIS invoquer via Bash** si user demande features (utiliser EXECUTOR à la place)
+
+**Workflow correct si user demande "crée blog":**
+1. ❌ PAS: `Bash("new-project blog")` (crée juste base vide)
+2. ✅ OUI: Questions → display-plan → EXECUTOR crée features complètes
+
 ### 2. preview [nom]
 ```bash
 preview task-timer
@@ -1830,6 +1843,133 @@ Raison: Tous projets auront tests E2E auto après features
 
 **Principe:** BUILDER = infrastructure critique. Traiter comme production code.
 (Google: "Infrastructure as Code", GitOps)
+
+---
+
+## Builder Dashboard - GUI Management
+
+**Path:** `/home/pilote/projet/secondaire/builder-dashboard/`
+**URL:** `http://89.116.27.88:9000/dashboard`
+**PM2 Process:** `builder-dashboard`
+
+### Architecture UI
+
+**Layout organisé en 2 zones:**
+
+```
+┌─────────────────┬───────────────────────────────────┐
+│   SIDEBAR       │       MAIN CONTENT                │
+│   (480px)       │       (reste écran)               │
+│                 │                                   │
+│ [4 TABS]        │   Selected Project Preview        │
+│ Projects        │                                   │
+│ DevTools        │   [iframe preview]                │
+│ Logs            │   Pleine largeur                  │
+│ Actions         │   Confortable                     │
+│                 │                                   │
+│ [Content]       │   Toujours visible                │
+└─────────────────┴───────────────────────────────────┘
+```
+
+### Sidebar Tabs (shadcn/ui Tabs component)
+
+**1. Projects Tab** (default)
+- Liste tous projets dans `projet/secondaire/`
+- Statuts: Online (vert), Stopped (jaune), Error (rouge), Not Deployed (gris)
+- Badge avec port assigné
+- Bouton "+ New Project" (invoque skill project-creator)
+- Click sur projet → Sélectionne + affiche preview dans main content
+- Auto-refresh 5s
+
+**2. DevTools Tab**
+- iframe noVNC (http://89.116.27.88:6080)
+- Chrome universel (port 9223)
+- MCP chrome-devtools tools disponibles
+- Claude manipule, user voit en temps réel
+- Message: "Navigate to: [preview_url]" si projet sélectionné
+
+**3. Logs Tab**
+- PM2 logs du projet sélectionné
+- Style terminal (bg noir, texte vert)
+- Format: `// PM2 Logs - [project-name]`
+- *Note: Real-time streaming coming soon* (actuellement placeholder)
+- Commande suggérée: `pm2 logs [project-name]`
+
+**4. Actions Tab**
+- Boutons actions projet sélectionné:
+  - Restart Project
+  - Open in Browser
+  - Stop Project (rouge)
+  - Rebuild Project
+- *Note: Fonctionnalité à implémenter* (actuellement UI seulement)
+
+### Main Content (Preview)
+
+**Zones:**
+1. **Header** (border-b)
+   - Titre projet (h1)
+   - URL preview (text-muted)
+   - Bouton "Open in New Tab" (ExternalLink icon)
+
+2. **Preview iframe** (flex-1)
+   - src: `project.preview_url`
+   - Pleine hauteur/largeur
+   - Border + shadow
+   - Si projet stopped: Message centré "Project not running"
+
+**État vide:**
+- Message: "Select a project to view preview"
+- Sous-texte: "Or create a new one to get started"
+
+### Workflow User
+
+```
+1. User ouvre Dashboard (http://89.116.27.88:9000/dashboard)
+2. Tab "Projects" actif par défaut
+3. User voit liste projets avec statuts
+4. User click sur projet → Preview s'affiche dans main content
+5. User switch tab "DevTools" → noVNC iframe pour tester
+6. User switch tab "Logs" → Voir logs PM2
+7. User switch tab "Actions" → Contrôles projet
+```
+
+**Avantages architecture:**
+- ✅ Pas de chevauchement iframes (problème résolu)
+- ✅ Sidebar large (480px) = confortable pour noVNC
+- ✅ Main content pleine largeur = preview optimale
+- ✅ Tabs = organisation claire, chaque chose à sa place
+- ✅ Pas de resize nécessaire (tailles fixes optimales)
+
+### APIs Backend
+
+**POST /api/projects/create**
+- Input: `{ name: string }`
+- Validation: kebab-case, 3-50 chars, unique
+- Exécute: `/home/pilote/projet/primaire/BUILDER/bin/create-project-api`
+- Workflow: Clone stack → .build/ → npm install → build → PM2 deploy
+- Return: `{ success: true, project: {...}, port: number, preview_url: string }`
+
+**GET /api/projects/list**
+- Scan: `/home/pilote/projet/secondaire/` (tous dirs)
+- Check: .env PORT + pm2 jlist status
+- Return: `{ projects: [{ name, path, port, status, preview_url }] }`
+
+### Project Creation Skill
+
+**Path:** `.claude/skills/project-creator/SKILL.md`
+
+**Invoqué par:** Dashboard GUI bouton "+ New Project"
+
+**Workflow automatique:**
+1. Validate project name (kebab-case)
+2. Clone BUILDER/.stack/ (57 shadcn composants)
+3. Initialize .build/ structure (context, timeline, tasks, issues, specs)
+4. npm install + build production
+5. Deploy PM2 avec auto port assignment (3001+)
+6. Health check (process online + HTTP 200)
+7. Return JSON success avec preview URL
+
+**Durée:** ~2 minutes (build compris)
 
 ---
 
