@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# BUILDER - List All Projects
+# Usage: list-projects
+
+echo "📋 BUILDER Projects"
+echo ""
+
+SECONDAIRE_DIR="/home/pilote/projet/secondaire"
+
+if [ ! -d "$SECONDAIRE_DIR" ]; then
+  echo "❌ No projects directory found"
+  exit 1
+fi
+
+# Get all projects
+PROJECTS=$(ls -1 "$SECONDAIRE_DIR" 2>/dev/null)
+
+if [ -z "$PROJECTS" ]; then
+  echo "   (No projects yet)"
+  echo ""
+  echo "🚀 Create your first project:"
+  echo "   new-project my-app"
+  exit 0
+fi
+
+# Get PM2 processes (use node to parse JSON)
+PM2_JSON_FILE=$(mktemp)
+pm2 jlist 2>/dev/null > "$PM2_JSON_FILE" || echo "[]" > "$PM2_JSON_FILE"
+
+echo "┌────────────────────┬──────────┬────────────────────────────────────┐"
+echo "│ Project            │ Status   │ Preview URL                        │"
+echo "├────────────────────┼──────────┼────────────────────────────────────┤"
+
+for PROJECT in $PROJECTS; do
+  PROJECT_DIR="$SECONDAIRE_DIR/$PROJECT"
+
+  # Skip if not a directory
+  if [ ! -d "$PROJECT_DIR" ]; then
+    continue
+  fi
+
+  # Check if deployed
+  if [ -f "$PROJECT_DIR/.env" ] && grep -q "^PORT=" "$PROJECT_DIR/.env"; then
+    PORT=$(grep "^PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2)
+
+    # Check PM2 status using node
+    PM2_STATUS=$(node -e "
+      const fs = require('fs');
+      try {
+        const data = JSON.parse(fs.readFileSync('$PM2_JSON_FILE', 'utf8'));
+        const proc = data.find(p => p.name === '$PROJECT');
+        console.log(proc ? proc.pm2_env.status : '');
+      } catch(e) { console.log(''); }
+    ")
+
+    if [ "$PM2_STATUS" == "online" ]; then
+      STATUS="🟢 online"
+      URL="http://89.116.27.88:$PORT"
+    elif [ "$PM2_STATUS" == "stopped" ]; then
+      STATUS="🟡 stopped"
+      URL="http://89.116.27.88:$PORT (stopped)"
+    else
+      STATUS="🔴 error"
+      URL="(PM2 process not found)"
+    fi
+  else
+    STATUS="⚪ not deployed"
+    URL="(run: preview $PROJECT)"
+  fi
+
+  # Format output
+  printf "│ %-18s │ %-8s │ %-34s │\n" "$PROJECT" "$STATUS" "$URL"
+done
+
+echo "└────────────────────┴──────────┴────────────────────────────────────┘"
+
+# Cleanup temp file
+rm -f "$PM2_JSON_FILE"
+
+echo ""
+echo "🔗 Commands:"
+echo "   new-project [name]    - Create new project"
+echo "   preview [name]        - Check preview status"
+echo "   pm2 logs [name]       - View logs"
+echo "   pm2 restart [name]    - Restart project"
+echo ""

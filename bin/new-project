@@ -1,0 +1,189 @@
+#!/bin/bash
+
+# BUILDER - Rapid Project Creation
+# Usage: new-project [project-name]
+
+set -e
+
+PROJECT_NAME="$1"
+
+if [ -z "$PROJECT_NAME" ]; then
+  echo "❌ Usage: new-project [project-name]"
+  echo "   Example: new-project task-timer"
+  exit 1
+fi
+
+# Validate project name (kebab-case)
+if ! [[ "$PROJECT_NAME" =~ ^[a-z0-9-]+$ ]]; then
+  echo "❌ Project name must be kebab-case (lowercase, hyphens only)"
+  echo "   Example: task-timer, admin-dashboard, e-commerce"
+  exit 1
+fi
+
+echo "🚀 Creating project: $PROJECT_NAME"
+echo ""
+
+# Path obligatoire
+PROJECT_DIR="/home/pilote/projet/secondaire/$PROJECT_NAME"
+
+# Check if already exists
+if [ -d "$PROJECT_DIR" ]; then
+  echo "❌ Project already exists: $PROJECT_DIR"
+  echo "   Use: cd $PROJECT_DIR"
+  exit 1
+fi
+
+# Create project directory
+echo "📁 Creating directory..."
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+# Clone BUILDER/.stack/ (base frontend)
+echo "📦 Cloning BUILDER stack..."
+cp -r /home/pilote/projet/primaire/BUILDER/.stack/* .
+
+# Create .build/ structure
+echo "📋 Initializing .build/..."
+mkdir -p .build/decisions
+
+# context.md
+cat > .build/context.md << 'EOF'
+# Project Context
+
+## Stack Technique
+- Frontend: Next.js 16 + shadcn/ui (57 components)
+- Styling: Tailwind CSS v4
+- Dark mode: Included (themes.css)
+
+## Architecture Actuelle
+(Will be populated after first features)
+
+## Conventions Établies
+- Components: components/ui/ (shadcn)
+- Pages: app/
+- Utils: lib/utils.ts
+EOF
+
+# timeline.md
+cat > .build/timeline.md << EOF
+# Timeline
+
+## $(date +"%Y-%m-%d %H:%M") - Project Initialization
+
+**Type**: Setup
+**Status**: ✓ Completed
+
+### Changes
+- Project created
+- BUILDER stack cloned (57 shadcn components)
+- .build/ structure initialized
+
+### Notes
+- Ready for feature development
+EOF
+
+# tasks.md
+cat > .build/tasks.md << 'EOF'
+# Tasks
+
+## 🚀 In Progress
+(No tasks yet)
+
+## 🔴 Blocked
+(No blockers)
+
+## 📋 Next Up
+(No tasks planned)
+
+## ✅ Recently Completed
+(No tasks completed)
+EOF
+
+# issues.md
+cat > .build/issues.md << 'EOF'
+# Issues
+
+## 🔴 Open Issues
+(No issues yet)
+
+## ✅ Resolved Issues
+(No issues resolved yet)
+EOF
+
+# specs.md
+cat > .build/specs.md << EOF
+# Specs - $PROJECT_NAME
+
+> **Créé**: $(date +"%Y-%m-%d")
+> **Dernière mise à jour**: $(date +"%Y-%m-%d")
+
+---
+
+## 🎯 Vision Projet
+
+(To be defined)
+
+---
+
+## 📦 Stack Technique
+
+**Frontend:**
+- Next.js 16
+- shadcn/ui (57 components)
+- Tailwind CSS v4
+
+**Backend:**
+- (To be defined if needed)
+
+**Database:**
+- (To be defined if needed)
+
+---
+
+## 🏗 Architecture
+
+(To be defined for complex full-stack projects)
+
+---
+
+## 📋 Features Roadmap
+
+### Phase 1 - MVP
+- [ ] (Features to be added)
+
+---
+
+## 🗂 Data Models
+
+(Models will be added after backend creation)
+
+---
+
+## 📌 ADRs Clés
+
+(Architecture decisions will be documented here)
+
+---
+
+## ⚠️ Contraintes & Décisions
+
+(Technical constraints will be documented here)
+EOF
+
+# Install dependencies
+echo "📥 Installing dependencies..."
+npm install --silent
+
+# Success message
+echo ""
+echo "✅ Project $PROJECT_NAME created successfully!"
+echo ""
+echo "📍 Location: $PROJECT_DIR"
+echo ""
+echo "🎯 Next steps:"
+echo "   1. cd $PROJECT_DIR"
+echo "   2. Tell Claude what features you want"
+echo "   3. Claude will build + deploy automatically"
+echo ""
+echo "🔗 Preview will be available at: http://89.116.27.88:[auto-assigned-port]"
+echo ""

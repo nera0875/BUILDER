@@ -77,11 +77,58 @@
 
 ---
 
+## Terminal Commands (RAPIDE - Créer Projets)
+
+**COMMANDS DISPONIBLES:**
+
+### 1. new-project [nom]
+```bash
+new-project task-timer
+# → Crée projet/secondaire/task-timer/
+# → Clone BUILDER/.stack/ (57 composants shadcn)
+# → Initialise .build/ structure
+# → npm install automatique
+# → Prêt pour développement
+```
+
+### 2. preview [nom]
+```bash
+preview task-timer
+# → Check si déployé
+# → Affiche URL preview (si online)
+# → Affiche status PM2
+# → Commandes logs/restart
+```
+
+### 3. list-projects
+```bash
+list-projects
+# → Table tous projets
+# → Status (online/stopped/not deployed)
+# → Preview URLs
+# → Commandes disponibles
+```
+
+**PATH AJOUTÉ AUTOMATIQUEMENT:**
+- Scripts dans: `/home/pilote/projet/primaire/BUILDER/bin/`
+- Ajouté à `~/.bashrc`: `export PATH="/home/pilote/projet/primaire/BUILDER/bin:$PATH"`
+- Accessible de n'importe où dans le terminal
+
+---
+
 ## Nouveau Projet - Questions & Setup (OBLIGATOIRE)
 
 **PATH OBLIGATOIRE:** `projet/secondaire/[NOM-PROJET]/`
 
-**Quand user demande créer projet:**
+**OPTION 1 (RAPIDE): User utilise terminal command**
+```bash
+new-project [nom-projet]
+# → Projet créé automatiquement
+# → User me dit: "crée dashboard avec X features"
+# → Je build + deploy directement
+```
+
+**OPTION 2 (MANUEL): User demande via chat**
 
 ### PHASE 0: Questions Clarification (STRICT - FEATURES UNIQUEMENT)
 

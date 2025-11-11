@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# BUILDER - Launch Preview
+# Usage: preview [project-name]
+
+set -e
+
+PROJECT_NAME="$1"
+
+if [ -z "$PROJECT_NAME" ]; then
+  # Try to detect from current directory
+  CURRENT_DIR=$(basename "$(pwd)")
+  if [ -f "package.json" ]; then
+    PROJECT_NAME="$CURRENT_DIR"
+  else
+    echo "❌ Usage: preview [project-name]"
+    echo "   Or run from project directory"
+    exit 1
+  fi
+fi
+
+PROJECT_DIR="/home/pilote/projet/secondaire/$PROJECT_NAME"
+
+if [ ! -d "$PROJECT_DIR" ]; then
+  echo "❌ Project not found: $PROJECT_NAME"
+  echo "   Available projects:"
+  ls /home/pilote/projet/secondaire/ 2>/dev/null || echo "   (No projects yet)"
+  exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+echo "🚀 Launching preview for: $PROJECT_NAME"
+echo ""
+
+# Check if .env exists (already deployed)
+if [ -f ".env" ] && grep -q "^PORT=" .env; then
+  PORT=$(grep "^PORT=" .env | cut -d'=' -f2)
+
+  # Check PM2 status using node
+  PM2_JSON=$(pm2 jlist 2>/dev/null || echo "[]")
+  PM2_STATUS=$(node -e "
+    try {
+      const data = JSON.parse(\`$PM2_JSON\`);
+      const proc = data.find(p => p.name === '$PROJECT_NAME');
+      console.log(proc ? proc.pm2_env.status : 'not_found');
+    } catch(e) { console.log('not_found'); }
+  ")
+
+  if [ "$PM2_STATUS" == "online" ]; then
+    echo "✅ Project already running"
+    echo ""
+    echo "🔗 Preview URL: http://89.116.27.88:$PORT"
+    echo ""
+    echo "📊 PM2 Status:"
+    pm2 show "$PROJECT_NAME" 2>/dev/null || true
+    echo ""
+    echo "📝 Logs:"
+    echo "   pm2 logs $PROJECT_NAME"
+    echo "   pm2 logs $PROJECT_NAME --lines 50"
+    echo ""
+    echo "🔄 Restart:"
+    echo "   pm2 restart $PROJECT_NAME"
+    exit 0
+  elif [ "$PM2_STATUS" == "stopped" ]; then
+    echo "⚠️  Project stopped, restarting..."
+    pm2 restart "$PROJECT_NAME"
+    sleep 2
+    echo "✅ Project restarted"
+    echo ""
+    echo "🔗 Preview URL: http://89.116.27.88:$PORT"
+    exit 0
+  fi
+fi
+
+# Not deployed yet
+echo "⚠️  Project not deployed yet"
+echo ""
+echo "🎯 To deploy and create preview:"
+echo "   Tell Claude: 'deploy $PROJECT_NAME'"
+echo ""
+echo "   Claude will:"
+echo "   1. Build production bundle"
+echo "   2. Assign port automatically"
+echo "   3. Start PM2 process"
+echo "   4. Generate preview URL"
+echo ""
