@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Display Plan - Pretty terminal output for project plans
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# Box drawing
+TOP_LEFT="╔"
+TOP_RIGHT="╗"
+BOTTOM_LEFT="╚"
+BOTTOM_RIGHT="╝"
+HORIZONTAL="═"
+VERTICAL="║"
+T_LEFT="╠"
+T_RIGHT="╣"
+
+# Width
+WIDTH=65
+
+# Functions
+print_line() {
+    local char="$1"
+    printf "${char}%.0s" $(seq 1 $WIDTH)
+}
+
+print_header() {
+    echo -e "${CYAN}${TOP_LEFT}$(print_line $HORIZONTAL)${TOP_RIGHT}${RESET}"
+    printf "${CYAN}${VERTICAL}${RESET} ${BOLD}${WHITE}%-$((WIDTH-2))s${RESET} ${CYAN}${VERTICAL}${RESET}\n" "$1"
+    echo -e "${CYAN}${T_LEFT}$(print_line $HORIZONTAL)${T_RIGHT}${RESET}"
+}
+
+print_section() {
+    echo -e "${CYAN}${VERTICAL}${RESET} ${YELLOW}$1${RESET}"
+}
+
+print_item() {
+    printf "${CYAN}${VERTICAL}${RESET}   ${GREEN}•${RESET} %-$((WIDTH-5))s ${CYAN}${VERTICAL}${RESET}\n" "$1"
+}
+
+print_footer() {
+    echo -e "${CYAN}${BOTTOM_LEFT}$(print_line $HORIZONTAL)${BOTTOM_RIGHT}${RESET}"
+}
+
+print_empty() {
+    printf "${CYAN}${VERTICAL}${RESET} %-$((WIDTH-2))s ${CYAN}${VERTICAL}${RESET}\n" ""
+}
+
+# Usage
+if [ "$1" == "--help" ] || [ -z "$1" ]; then
+    echo "Usage: display-plan <project-name> <stack> <route1> <route2> ..."
+    echo "Example: display-plan simple-blog 'Next.js+Prisma' '/blog' '/new'"
+    exit 0
+fi
+
+PROJECT_NAME="$1"
+STACK="$2"
+shift 2
+ROUTES=("$@")
+
+# Display
+clear
+print_header "📋 PLAN CRÉATION: $PROJECT_NAME"
+print_empty
+print_section "🎯 STACK TECHNIQUE"
+IFS='+' read -ra STACK_PARTS <<< "$STACK"
+for part in "${STACK_PARTS[@]}"; do
+    print_item "$part"
+done
+print_empty
+print_section "🗂️  ROUTES PRINCIPALES"
+for route in "${ROUTES[@]}"; do
+    print_item "$route"
+done
+print_empty
+print_footer
+
+echo ""
+read -p "$(echo -e ${GREEN}Valide pour continuer? [y/n]:${RESET} )" -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}✅ Création lancée!${RESET}"
+    exit 0
+else
+    echo -e "${RED}❌ Annulé${RESET}"
+    exit 1
+fi
