@@ -32,6 +32,175 @@
 
 ---
 
+## MANDATORY CHECKS (NON-NÉGOCIABLES - ARRÊT FORCÉ)
+
+**AVANT CHAQUE ACTION - CHECKS OBLIGATOIRES:**
+
+### CHECK 1: Nombre de Fichiers (STOP si >= 5)
+
+```
+User demande feature/projet → Je COMPTE fichiers nécessaires
+
+SI >= 5 fichiers:
+  ❌ STOP IMMÉDIATEMENT
+  ❌ NE PAS invoquer 1 seul EXECUTOR avec tout
+  ✅ OBLIGATOIRE: Décomposer en vagues parallèles
+  ✅ Afficher plan vagues au user AVANT exécution
+
+SI < 5 fichiers:
+  ✅ OK: 1 EXECUTOR ou 2-3 en parallèle
+```
+
+**Exemple INTERDIT:**
+```javascript
+// ❌ JAMAIS FAIRE ÇA (10 fichiers = 1 agent)
+Task(executor, "Crée projet Pomodoro complet avec:
+- schema.prisma
+- 8 composants
+- 3 actions
+- hooks
+etc...")
+→ VIOLATION! >= 5 fichiers détectés!
+```
+
+**Exemple CORRECT:**
+```javascript
+// ✅ OBLIGATOIRE (10 fichiers = 3 vagues)
+// Vague 1: 5 agents parallèles (fichiers indépendants)
+Task(executor, "Crée schema.prisma ONLY")
+Task(executor, "Crée types.ts ONLY")
+Task(executor, "Crée audio.ts ONLY")
+... x5
+
+// Vague 2: 3 agents parallèles (dépendent vague 1)
+Task(executor, "Crée timer.tsx ONLY")
+... x3
+
+// Vague 3: 1 agent (page finale)
+Task(executor, "Crée page.tsx ONLY")
+```
+
+---
+
+### CHECK 2: Prompt Agent (STOP si manque keywords)
+
+```
+AVANT invoquer Task(executor, prompt):
+
+✅ VÉRIFIER prompt contient TOUS ces keywords:
+  1. "Path: [ABSOLU]"
+  2. "SKIP anti-duplication scan"
+  3. "OVERWRITE existing file OK" OU "New file, no conflicts"
+  4. "Return: ✓ [filename]"
+
+❌ SI 1 keyword manquant:
+  → STOP
+  → Reformuler prompt avec keywords
+  → Puis invoquer
+```
+
+**Exemple INTERDIT:**
+```javascript
+// ❌ Prompt vague (manque keywords)
+Task(executor, "Crée README.md pour le blog")
+→ VIOLATION! Manque: Path absolu, SKIP, OVERWRITE, Return format
+```
+
+**Exemple CORRECT:**
+```javascript
+// ✅ Prompt avec TOUS keywords
+Task(executor, `Path: /home/pilote/projet/secondaire/blog/README.md
+
+OVERWRITE README.md existant avec content:
+[content exact]
+
+SKIP anti-duplication scan (orchestrator confirmed)
+
+Return: ✓ README.md`)
+```
+
+---
+
+### CHECK 3: Background Commands (STOP si command > 30s blocking)
+
+```
+AVANT Bash command longue:
+
+✅ IDENTIFIER commandes longues (>30s):
+  - npm install
+  - npm run build
+  - prisma generate
+  - git clone large repos
+
+❌ SI commande longue SANS run_in_background:
+  → STOP
+  → Ajouter run_in_background: true
+  → Puis lancer
+
+✅ CORRECT:
+Bash("npm install", {run_in_background: true})
+→ Return immédiat, continue autres tasks
+```
+
+---
+
+### CHECK 4: Agent Unique avec Mega-Task (STOP ABSOLU)
+
+```
+INTERDIT ABSOLU - ARRÊT IMMÉDIAT:
+
+❌ 1 agent avec prompt >500 tokens
+❌ 1 agent avec "crée projet complet"
+❌ 1 agent avec "implémente toutes les features"
+❌ 1 agent avec liste >3 fichiers à créer
+
+✅ RÈGLE FORCÉE:
+  - 1 agent = 1 fichier OU 1 action atomique
+  - Max 3 fichiers par agent (si ultra-simple)
+  - Sinon: Décomposer en vagues
+```
+
+**Détection automatique:**
+```
+Je lis user request
+Je compte fichiers/actions nécessaires
+SI total > 5:
+  → STOP
+  → Plan vagues
+  → Affiche plan user
+  → User valide
+  → Exécute vague par vague
+```
+
+---
+
+## WORKFLOW FORCÉ (Pas de déviation possible)
+
+**Nouveau Projet (>= 5 fichiers):**
+
+```
+STEP 1: Count fichiers
+STEP 2: SI >= 5 → STOP → Plan vagues
+STEP 3: Affiche plan user (nombre vagues, fichiers par vague)
+STEP 4: User valide
+STEP 5: Vague 1 (npm background + fichiers simples)
+STEP 6: Check npm done
+STEP 7: Vague 2 (composants avec imports)
+STEP 8: Vague 3 (page finale)
+STEP 9: Tests + Deploy
+```
+
+**Feature Simple (< 5 fichiers):**
+
+```
+STEP 1: Count fichiers
+STEP 2: SI < 5 → OK direct
+STEP 3: 1-3 agents avec prompts STRICT (keywords obligatoires)
+STEP 4: Done
+```
+
+---
+
 ## Workflow Auto (STRICT)
 
 ### STEP 1: Détection Type Requête (TOUJOURS EN PREMIER)
