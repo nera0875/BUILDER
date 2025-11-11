@@ -1,0 +1,191 @@
+#!/bin/bash
+
+# BUILDER - Create Project API Script
+# Called by Dashboard API: POST /api/projects/create
+# Usage: create-project-api [project-name]
+
+set -e
+
+PROJECT_NAME="$1"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Error handler
+error_exit() {
+  echo "{\"success\": false, \"error\": \"$1\", \"message\": \"$2\"}"
+  exit 1
+}
+
+# Validate project name
+if [ -z "$PROJECT_NAME" ]; then
+  error_exit "MISSING_NAME" "Project name is required"
+fi
+
+if ! [[ "$PROJECT_NAME" =~ ^[a-z0-9-]{3,50}$ ]]; then
+  error_exit "INVALID_NAME" "Project name must be kebab-case (lowercase, hyphens only, 3-50 chars)"
+fi
+
+# Check if project already exists
+PROJECT_PATH="/home/pilote/projet/secondaire/$PROJECT_NAME"
+if [ -d "$PROJECT_PATH" ]; then
+  # Get existing port if deployed
+  EXISTING_PORT=$(grep "^PORT=" "$PROJECT_PATH/.env" 2>/dev/null | cut -d'=' -f2 || echo "unknown")
+  error_exit "PROJECT_EXISTS" "Project '$PROJECT_NAME' already exists (port: $EXISTING_PORT)"
+fi
+
+# Step 1: Clone BUILDER stack
+mkdir -p "$PROJECT_PATH"
+cp -r /home/pilote/projet/primaire/BUILDER/.stack/* "$PROJECT_PATH"/ 2>/dev/null || error_exit "CLONE_FAILED" "Failed to clone BUILDER stack"
+
+# Step 2: Initialize .build/ structure
+mkdir -p "$PROJECT_PATH/.build/decisions"
+
+cat > "$PROJECT_PATH/.build/context.md" << 'EOF'
+# Project Context
+
+## Stack Technique
+- Frontend: Next.js 16 + shadcn/ui (57 components)
+- Styling: Tailwind CSS v4
+- Dark mode: Included (themes.css)
+
+## Architecture Actuelle
+(Will be populated after first features)
+
+## Conventions Établies
+- Components: components/ui/ (shadcn)
+- Pages: app/
+- Utils: lib/utils.ts
+EOF
+
+cat > "$PROJECT_PATH/.build/timeline.md" << EOF
+# Timeline
+
+## $(date +"%Y-%m-%d %H:%M") - Project Initialization
+
+**Type**: Setup
+**Status**: ✓ Completed
+**Source**: Dashboard GUI
+
+### Changes
+- Project created via Dashboard
+- BUILDER stack cloned (57 shadcn components)
+- .build/ structure initialized
+
+### Notes
+- Ready for feature development
+EOF
+
+touch "$PROJECT_PATH/.build/tasks.md"
+touch "$PROJECT_PATH/.build/issues.md"
+touch "$PROJECT_PATH/.build/specs.md"
+
+# Step 3: Install dependencies
+cd "$PROJECT_PATH"
+npm install --silent 2>&1 > /dev/null || error_exit "INSTALL_FAILED" "npm install failed"
+
+# Step 4: Build production
+rm -rf .next
+npm run build 2>&1 > /dev/null || error_exit "BUILD_FAILED" "Production build failed"
+
+if [ ! -f ".next/BUILD_ID" ]; then
+  error_exit "BUILD_INVALID" "Build succeeded but BUILD_ID missing (not a production build)"
+fi
+
+# Step 5: Deploy to PM2
+
+# Get next available port
+PM2_JSON=$(pm2 jlist 2>/dev/null || echo "[]")
+PORT=$(node -e "
+  const data = $PM2_JSON;
+  const ports = data
+    .map(p => p.pm2_env.PORT)
+    .filter(p => p && !isNaN(p))
+    .map(Number);
+  console.log(Math.max(3000, ...ports) + 1);
+")
+
+# Save port to .env
+echo "PORT=$PORT" > .env
+
+# Create ecosystem.config.js
+cat > ecosystem.config.js << EOFPM2
+module.exports = {
+  apps: [{
+    name: '$PROJECT_NAME',
+    script: 'npm',
+    args: 'start',
+    cwd: '$PROJECT_PATH',
+    instances: 1,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: $PORT
+    },
+    error_file: '~/.pm2/logs/$PROJECT_NAME-error.log',
+    out_file: '~/.pm2/logs/$PROJECT_NAME-out.log',
+    merge_logs: true,
+    autorestart: true,
+    watch: false
+  }]
+}
+EOFPM2
+
+# Start PM2
+pm2 start ecosystem.config.js 2>&1 > /dev/null || error_exit "PM2_START_FAILED" "Failed to start PM2 process"
+pm2 save 2>&1 > /dev/null
+
+# Health check (max 15 seconds)
+for i in {1..15}; do
+  sleep 1
+
+  STATUS=$(pm2 jlist 2>/dev/null | node -e "
+    let data = '';
+    process.stdin.on('data', chunk => data += chunk);
+    process.stdin.on('end', () => {
+      try {
+        const procs = JSON.parse(data);
+        const proc = procs.find(p => p.name === '$PROJECT_NAME');
+        console.log(proc ? proc.pm2_env.status : 'not_found');
+      } catch(e) { console.log('error'); }
+    });
+  ")
+
+  if [ "$STATUS" == "online" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT 2>/dev/null || echo "000")
+
+    if [ "$HTTP_CODE" == "200" ]; then
+      # Success! Return JSON
+      echo "{
+        \"success\": true,
+        \"project\": {
+          \"name\": \"$PROJECT_NAME\",
+          \"path\": \"$PROJECT_PATH\",
+          \"port\": $PORT,
+          \"preview_url\": \"http://89.116.27.88:$PORT\",
+          \"pm2_status\": \"online\",
+          \"created_at\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"
+        }
+      }"
+      exit 0
+    fi
+  fi
+done
+
+# Timeout but process may still be starting
+echo "{
+  \"success\": true,
+  \"project\": {
+    \"name\": \"$PROJECT_NAME\",
+    \"path\": \"$PROJECT_PATH\",
+    \"port\": $PORT,
+    \"preview_url\": \"http://89.116.27.88:$PORT\",
+    \"pm2_status\": \"starting\",
+    \"created_at\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"
+  },
+  \"warning\": \"Health check timeout - project may still be starting\"
+}"
+exit 0
