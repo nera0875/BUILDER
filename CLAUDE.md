@@ -52,6 +52,16 @@
    → Bugs connus, solutions documentées, patterns à éviter
 ```
 
+**SI projet nécessite base de données:**
+
+```
+4. Skill("database") - OBLIGATOIRE
+   → PostgreSQL VPS (credentials hardcodés)
+   → Création database, Prisma setup, migrations
+   → Keywords: "database", "db", "postgresql", "prisma", "sql"
+   → Auto-chargé si backend avec stockage données
+```
+
 **SI `.build/` n'existe pas → Le créer automatiquement**
 
 **Principe:** Never code blind. Always know current state.
