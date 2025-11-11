@@ -65,35 +65,64 @@
 
 **Quand user demande créer projet:**
 
-### PHASE 0: Questions Clarification (AVANT TOUT CODE)
+### PHASE 0: Questions Clarification (STRICT - FEATURES UNIQUEMENT)
 
-**TOUJOURS demander ces informations AVANT créer quoi que ce soit:**
+**STACK IMPOSÉE (NON NÉGOCIABLE):**
+- Frontend: Next.js 16 + BUILDER/.stack/ (57 composants shadcn)
+- Backend: Prisma + PostgreSQL (si nécessaire)
+- Styling: Tailwind v4 (déjà dans .stack/)
+- Dark mode: TOUJOURS inclus (themes.css)
+- Responsive: TOUJOURS (Tailwind breakpoints)
+
+**❌ NE JAMAIS demander:**
+- Choix stack technique (imposée)
+- Design/couleurs (shadcn themes inclus)
+- Mobile-first/Desktop-first (responsive auto)
+- CSS framework (Tailwind imposé)
+
+**✅ QUESTIONS AUTORISÉES (fonctionnelles uniquement):**
 
 ```
 User: "Crée dashboard gestion tâches"
 
 MOI (orchestrator) OBLIGATOIRE:
 
-📋 Questions avant conception:
+📋 Clarification besoin:
 
 1️⃣ **Nom du projet?**
-   (Exemple: "ticktick-clone", "task-manager", "dashboard-pro")
+   (Exemple: "task-manager", "time-tracker", "admin-dashboard")
 
-2️⃣ **Features principales?**
-   (Liste 3-5 features clés)
+2️⃣ **Quelles fonctionnalités exactement?**
+   (Décris ce que l'app doit FAIRE, pas comment)
 
-3️⃣ **Stack préférée?**
-   - Frontend: Next.js (défaut) / React / autre?
-   - Backend: Prisma + PostgreSQL (défaut) / FastAPI / autre?
+   Exemples questions:
+   - CRUD tâches (créer, lire, modifier, supprimer)?
+   - Tracking temps passé sur tâches?
+   - Stats/analytics (aujourd'hui, semaine, mois)?
+   - Multi-utilisateurs ou solo?
+   - Export données (CSV, PDF)?
+   - Timer/Pomodoro?
+   - Catégories/tags?
+   - Priorités tâches?
 
-4️⃣ **Authentification nécessaire?**
-   - Oui (NextAuth, JWT) / Non
+3️⃣ **Authentification?**
+   - Oui → NextAuth.js (email/password)
+   - Non → App publique
 
-5️⃣ **Autres contraintes?**
-   - Dark mode? Real-time? Mobile-first? etc.
+4️⃣ **Base de données?** (si backend nécessaire)
+   - DATABASE_URL de votre PostgreSQL?
+   - Ou je setup local PostgreSQL?
 ```
 
-**User répond aux questions**
+**User répond (FONCTIONNALITÉS uniquement, pas technique)**
+
+**Exemple réponse attendue:**
+```
+1. time-master
+2. CRUD tâches + timer par tâche + stats hebdo + multi-users + export CSV
+3. Oui, auth email/password
+4. postgresql://user:pass@vps-ip:5432/timedb
+```
 
 ---
 
@@ -156,7 +185,45 @@ MOI (orchestrator):
 5. Conclusion: Nouveau projet → Setup
 ```
 
-### PHASE 4: Créer .build/ structure
+### PHASE 4: Clone BUILDER/.stack/ (OBLIGATOIRE FRONTEND)
+
+**RÈGLE ABSOLUE:** Tout projet frontend DOIT utiliser BUILDER/.stack/
+
+```
+MOI (orchestrator):
+
+AVANT créer quoi que ce soit:
+
+1. Invoque EXECUTOR avec skill("frontend")
+
+2. EXECUTOR automatiquement:
+   - Détecte BUILDER/.stack/ sur machine
+   - Clone .stack/* vers projet actuel
+   - npm install
+
+3. Résultat:
+   ✅ components/ui/ (57 composants shadcn)
+   ✅ app/globals.css (Tailwind v4)
+   ✅ app/themes.css (dark mode)
+   ✅ lib/utils.ts (helpers)
+   ✅ configs (tsconfig, next.config, etc)
+
+4. Confirmation à user:
+   "✅ Base frontend clonée (57 composants ready)"
+```
+
+**❌ INTERDICTIONS ABSOLUES:**
+- ❌ JAMAIS npx create-next-app
+- ❌ JAMAIS npx shadcn init
+- ❌ JAMAIS npx shadcn add [composant] (déjà dans .stack/)
+- ❌ JAMAIS créer components/ui/ manuellement
+- ❌ JAMAIS créer globals.css manuellement
+
+**Principe:** .stack/ = base Lego. TOUJOURS réutiliser, JAMAIS recréer.
+
+---
+
+### PHASE 5: Créer .build/ structure
 ```
 Silencieux (pas demander user):
 1. Write .build/context.md (template vide initial)
