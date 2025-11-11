@@ -1025,19 +1025,63 @@ Return: ✓ post-card.tsx")
 ```
 → Agent créé direct (2-3 tool uses, 5-10s)
 
-**Règles prompts optimisés:**
-1. ✅ Path complet absolu
-2. ✅ Imports exacts avec chemins confirmés
-3. ✅ Props/types détaillés
-4. ✅ "SKIP anti-dup scan" si déjà vérifié par orchestrator
-5. ✅ "Return bref: ✓ [filename]"
-6. ❌ Pas de "Charge Skill()" dans prompt (agent le fait auto)
-7. ❌ Pas de prompts vagues ("crée composant blog")
+**Règles prompts optimisés (OBLIGATOIRE - MOI orchestrator):**
+
+**TEMPLATE OBLIGATOIRE pour CHAQUE agent:**
+```
+Path: [CHEMIN ABSOLU COMPLET]
+
+[ACTION PRÉCISE]:
+- [Détail 1 avec valeurs exactes]
+- [Détail 2 avec imports confirmés]
+- [Détail 3 avec props/types]
+
+SKIP anti-duplication scan (orchestrator confirmed)
+[SI fichier existe déjà: "OVERWRITE existing file OK"]
+[SI nouveau fichier: "New file, no conflicts"]
+
+Return: ✓ [filename]
+```
+
+**Keywords magiques (TOUJOURS inclure):**
+1. ✅ `SKIP anti-duplication scan` (agent skip 30+ tools)
+2. ✅ `orchestrator confirmed` (agent trust mes infos)
+3. ✅ `OVERWRITE existing file OK` (si fichier existe - évite confusion)
+4. ✅ `New file, no conflicts` (si nouveau - agent créé direct)
+5. ✅ `Return: ✓ [filename]` (format bref return)
+
+**Checklist avant invoquer agent:**
+- [ ] Path absolu complet fourni?
+- [ ] Imports avec chemins exacts confirmés?
+- [ ] "SKIP anti-duplication scan" présent?
+- [ ] "OVERWRITE" ou "New file" spécifié?
+- [ ] Content exact OU specs ultra-détaillées?
+
+**❌ INTERDIT (prompts vagues):**
+```
+"Crée README.md"
+"Crée composant blog"
+"Ajoute button"
+```
+→ Agent scan tout (10+ tools, 1m+)
+
+**✅ OBLIGATOIRE (prompts précis):**
+```
+Path: /home/pilote/projet/secondaire/blog/README.md
+
+OVERWRITE README.md existant avec content exact:
+[content complet ici]
+
+SKIP anti-duplication scan (orchestrator confirmed overwrite OK)
+
+Return: ✓ README.md
+```
+→ Agent Write direct (1 tool, 5s)
 
 **Gain:**
-- Prompt vague: 25-30s par agent
-- Prompt précis: 5-10s par agent
-- **Gain: 3x plus rapide par fichier**
+- Prompt vague: 1m+ (10+ tools, scan projet, confusion)
+- Prompt précis: 5-10s (1-2 tools, action directe)
+- **Gain: 10x plus rapide par fichier**
 
 ### Token Optimization Intégrée
 
