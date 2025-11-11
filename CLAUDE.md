@@ -452,15 +452,31 @@ User demande prochaine feature:
       - SI bug → MOI (orchestrator) update .build/issues.md
       - SI failed → Invoque EXECUTOR pour fix, puis re-test
 
+   D. Phase Deployment (AUTO après tests passed) - NOUVEAU:
+      - Invoque Skill("deployment") automatiquement
+      - deployment skill:
+        * Assign port unique (ex: 3001)
+        * pm2 start ecosystem.config.js
+        * Health check (process + HTTP 200)
+        * Generate preview URL
+      - Update .build/context.md (section Deployment)
+      - Return preview URL
+
 7. Finalize (MOI - orchestrator):
-   - Update .build/context.md (routes, composants, stack, models)
-   - Append .build/timeline.md (feature complète avec détails)
+   - Update .build/context.md (routes, composants, stack, models, deployment)
+   - Append .build/timeline.md (feature complète avec détails + deploy info)
    - Mark task done .build/tasks.md (move In Progress → Completed)
-   - Confirmation user: "✓ [FEATURE] déployé - [SUMMARY]"
+   - Confirmation user:
+     "✓ [FEATURE] déployé
+
+     Preview: http://89.116.27.88:3001
+
+     PM2: online
+     Commandes: pm2 logs [project-name]"
 ```
 
-**Pattern:** Backend first (data layer), Frontend second (UI layer), Tests last (validation)
-(Principe: Vercel's "API-first development", Stripe's "Work backwards from API")
+**Pattern:** Backend first → Frontend second → Tests third → Deploy AUTO
+(Principe: Vercel's "API-first development", Stripe's "Work backwards from API", Netlify's "Instant previews")
 
 ---
 
@@ -658,6 +674,62 @@ User demande prochaine feature:
 
 **Principe:** Test what you build, immediately.
 (Google: "Test early, test often", Facebook: "Ship with confidence")
+
+---
+
+### DEPLOYMENT (Auto après tests - NOUVEAU)
+
+**Quand invoquer:**
+1. **Auto (OBLIGATOIRE)** après TESTER validation passed
+2. **Auto** après build complété (npm run build success)
+3. **Sur demande** si user demande "preview", "deploy", "lance projet"
+
+**Skills chargé:** `deployment.md`
+
+**Rôle:**
+1. Assign port unique (auto-increment depuis projets PM2 existants)
+2. Create ecosystem.config.js (PM2 production config)
+3. Start PM2 process (npm start via PM2)
+4. Health check (process online + HTTP 200)
+5. Generate preview URL (http://89.116.27.88:[PORT])
+6. Update .build/context.md (section Deployment)
+
+**Workflow:**
+```
+1. Calcule next available port (ex: 3001, 3002...)
+2. Update .env avec PORT
+3. Crée ecosystem.config.js
+4. pm2 start ecosystem.config.js
+5. pm2 save (persist reboot)
+6. Health check (max 15s)
+   - Process online?
+   - HTTP 200 OK?
+7. Update .build/context.md:
+   ## Deployment
+   - Port: 3001
+   - PM2 Process: task-timer
+   - Preview URL: http://89.116.27.88:3001
+   - Status: ✅ Running
+8. Confirmation user:
+   "✅ Projet task-timer déployé
+
+   Preview: http://89.116.27.88:3001
+
+   PM2 status: online
+
+   Commandes:
+   - pm2 logs task-timer
+   - pm2 restart task-timer
+   - pm2 stop task-timer"
+```
+
+**Si deployment fail:**
+- Logs PM2 affichés (30 dernières lignes)
+- Diagnostic error (port conflit? build manquant? env vars?)
+- Crée entrée .build/issues.md (si erreur récurrente)
+
+**Principe:** Zero-config deployment. User clique preview URL immédiatement.
+(Vercel: "Deploy in seconds", Netlify: "Instant previews")
 
 ---
 
@@ -1198,8 +1270,163 @@ Je décide, j'explique, je demande validation finale.
 6. **Bias for Action** - Décider et exécuter, pas attendre
 7. **Communicate Decisions** - Expliquer pourquoi, pas juste quoi
 8. **User Validates, I Execute** - Je suis l'expert, user approuve direction
+9. **Git Push BUILDER Changes** - Auto commit+push si modification BUILDER
 
 **Inspiré de:** Amazon Leadership Principles, Google SRE, Netflix Culture, Stripe API Philosophy
+
+---
+
+## Modifications BUILDER (Auto Git Workflow)
+
+**RÈGLE CRITIQUE:** BUILDER = projet meta, source vérité pour tous projets futurs.
+Toute modification DOIT être persistée sur GitHub immédiatement.
+
+### Fichiers Concernés
+
+**Si je modifie un de ces fichiers:**
+- `.stack/*` (templates frontend/backend)
+- `.claude/skills/*` (skills logic)
+- `.claude/agents/*` (agents config)
+- `CLAUDE.md` (orchestrator instructions)
+
+### Workflow Obligatoire (3 Steps)
+
+```bash
+# Step 1: Modification du fichier
+# (déjà faite)
+
+# Step 2: IMMÉDIATEMENT après modification
+git add [fichier(s) modifié(s)]
+git commit -m "$(cat <<'EOF'
+[type]([scope]): [description courte]
+
+[Explication détaillée du problème résolu ou amélioration]
+
+Impact: [Comment ça affecte futurs projets]
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)"
+
+# Step 3: Push GitHub
+git push
+```
+
+### Confirmation User
+
+**Après push, TOUJOURS confirmer au user:**
+
+```
+✅ BUILDER mis à jour et pushed to GitHub
+
+Fichier: [path relatif]
+Changement: [description 1 ligne]
+Commit: [hash court]
+GitHub: https://github.com/nera0875/BUILDER/commit/[hash]
+
+Raison: [Impact sur futurs projets]
+```
+
+### Exemples Concrets
+
+**Example 1: Fix template bug**
+```
+Modification: .stack/next.config.ts (supprimé assetPrefix externe)
+
+Workflow:
+1. Edit .stack/next.config.ts
+2. git add .stack/next.config.ts
+3. git commit -m "fix(stack): remove external assetPrefix..."
+4. git push
+
+Confirmation:
+✅ BUILDER mis à jour et pushed to GitHub
+
+Fichier: .stack/next.config.ts
+Changement: Supprimé assetPrefix externe shadcnuikit.com
+Commit: a96e9de
+GitHub: https://github.com/nera0875/BUILDER/commit/a96e9de
+
+Raison: Tous futurs projets auront assets locaux (pas 404 CSS/JS)
+```
+
+**Example 2: Améliorer skill**
+```
+Modification: .claude/skills/frontend/SKILL.md (ajout anti-pattern)
+
+Workflow:
+1. Edit .claude/skills/frontend/SKILL.md
+2. git add .claude/skills/frontend/SKILL.md
+3. git commit -m "feat(frontend): add anti-pattern section for useEffect deps"
+4. git push
+
+Confirmation:
+✅ BUILDER mis à jour et pushed to GitHub
+
+Fichier: .claude/skills/frontend/SKILL.md
+Changement: Ajouté section anti-patterns useEffect dependencies
+Commit: b7d3f21
+GitHub: https://github.com/nera0875/BUILDER/commit/b7d3f21
+
+Raison: EXECUTOR évitera bugs deps futures features React
+```
+
+**Example 3: Nouveau skill**
+```
+Modification: .claude/skills/testing/SKILL.md (création nouveau skill)
+
+Workflow:
+1. Write .claude/skills/testing/SKILL.md
+2. git add .claude/skills/testing/
+3. git commit -m "feat(skills): add testing skill with Chrome DevTools MCP"
+4. git push
+
+Confirmation:
+✅ BUILDER mis à jour et pushed to GitHub
+
+Fichier: .claude/skills/testing/SKILL.md
+Changement: Nouveau skill testing (E2E Chrome DevTools)
+Commit: c4e8d92
+GitHub: https://github.com/nera0875/BUILDER/commit/c4e8d92
+
+Raison: Tous projets auront tests E2E auto après features
+```
+
+### Commit Message Format
+
+**Convention:** Conventional Commits (type(scope): description)
+
+**Types:**
+- `fix:` Bug fix dans template/skill
+- `feat:` Nouvelle feature/skill
+- `refactor:` Restructuration sans changement behavior
+- `docs:` Documentation (CLAUDE.md, README)
+- `chore:` Maintenance (dependencies, configs)
+
+**Scopes:**
+- `stack` - Modifications .stack/
+- `skills` - Modifications skills
+- `agents` - Modifications agents
+- `orchestrator` - Modifications CLAUDE.md
+
+### Pourquoi Auto-Push?
+
+**Sans auto-push:**
+- ❌ Modifications restent locales uniquement
+- ❌ Si machine crash → perte changements
+- ❌ Pas de traçabilité (pas git history)
+- ❌ Futurs projets utilisent vieux template buggé
+
+**Avec auto-push:**
+- ✅ Backup GitHub immédiat
+- ✅ Git history = traçabilité complète
+- ✅ Sync multi-machines possible
+- ✅ Futurs projets = template à jour
+
+**Principe:** BUILDER = infrastructure critique. Traiter comme production code.
+(Google: "Infrastructure as Code", GitOps)
 
 ---
 
