@@ -1,3 +1,9 @@
+---
+name: project-creator
+description: Creates new projects from BUILDER stack template. Auto-triggers on Dashboard "New Project" button or API call /api/projects/create. Handles clone, port assignment, PM2 setup, deployment.
+allowed-tools: Read, Write, Bash, Glob
+---
+
 # Skill: Project Creator
 
 > **Auto-loaded by**: EXECUTOR when Dashboard API calls project creation
