@@ -13,16 +13,12 @@ import { cn } from '@/lib/utils'
 import {
   ExternalLink,
   FolderOpen,
-  RefreshCw,
-  ScrollText,
-  Settings
+  RefreshCw
 } from 'lucide-react'
-import { HealthDashboard } from '@/components/health-dashboard'
-import { NginxPortsManager } from '@/components/nginx-ports-manager'
-import { PM2ProcessList } from '@/components/pm2-process-list'
-import { ZombieProcessKiller } from '@/components/zombie-process-killer'
+import { VncViewer } from '@/components/vnc-viewer'
+import { DiagnosticsTabs } from '@/components/diagnostics-tabs'
 
-type View = 'projects' | 'devtools' | 'logs' | 'actions' | 'health'
+type View = 'projects' | 'devtools' | 'health'
 
 type ProjectStatus = 'online' | 'stopped' | 'error' | 'not_deployed'
 
@@ -159,7 +155,19 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex-1 p-4">
-                    {selectedProject.status === 'online' && selectedProject.preview_url ? (
+                    {selectedProject.status === 'not_deployed' ? (
+                      <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="flex gap-1">
+                            <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="h-2 w-2 rounded-full bg-primary animate-bounce"></div>
+                          </div>
+                        </div>
+                        <p className="text-lg font-medium">Building your project...</p>
+                        <p className="text-sm mt-2">Preview will be available after first deployment</p>
+                      </div>
+                    ) : selectedProject.status === 'online' && selectedProject.preview_url ? (
                       <iframe
                         src={selectedProject.preview_url}
                         className="w-full h-full border rounded-lg"
@@ -170,9 +178,7 @@ export default function DashboardPage() {
                         <div className="text-center">
                           <p className="text-lg mb-2">Project not running</p>
                           <p className="text-sm">
-                            {selectedProject.status === 'not_deployed'
-                              ? 'Deploy this project first'
-                              : 'Start the project to see preview'}
+                            Start the project to see preview
                           </p>
                         </div>
                       </div>
@@ -201,75 +207,12 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex-1 overflow-hidden">
-              <iframe
-                src="http://89.116.27.88:6081/vnc.html?host=89.116.27.88&port=6081&autoconnect=true&reconnect=true&reconnect_delay=5000&resize=scale&quality=9"
-                className="w-full h-full border-0"
+              <VncViewer
+                url="http://89.116.27.88:6081/vnc.html?host=89.116.27.88&port=6081&autoconnect=true&reconnect=true&reconnect_delay=5000&resize=scale&quality=9"
                 title="Chrome DevTools (noVNC)"
+                vncWidth={1920}
+                vncHeight={1080}
               />
-            </div>
-          </div>
-        )}
-
-        {/* Logs View */}
-        {activeView === 'logs' && (
-          <div className="flex flex-col h-full">
-            <div className="border-b p-4 bg-background">
-              <h2 className="text-xl font-bold">PM2 Logs</h2>
-              {selectedProject && (
-                <p className="text-sm text-muted-foreground">
-                  {selectedProject.name}
-                </p>
-              )}
-            </div>
-            <div className="flex-1 p-4">
-              {selectedProject ? (
-                <div className="bg-black/95 text-green-400 font-mono text-sm p-4 rounded-lg h-full overflow-auto">
-                  <p className="text-yellow-400 mb-2">// PM2 Logs - {selectedProject.name}</p>
-                  <p className="text-muted-foreground">
-                    Real-time logs coming soon...
-                  </p>
-                  <p className="text-muted-foreground mt-2">
-                    Command: pm2 logs {selectedProject.name}
-                  </p>
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <ScrollText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">Select a project to view logs</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Actions View */}
-        {activeView === 'actions' && (
-          <div className="flex flex-col h-full">
-            <div className="border-b p-4 bg-background">
-              <h2 className="text-xl font-bold">Project Actions</h2>
-              {selectedProject && (
-                <p className="text-sm text-muted-foreground">
-                  {selectedProject.name}
-                </p>
-              )}
-            </div>
-            <div className="flex-1 p-4">
-              {selectedProject ? (
-                <ProjectActions
-                  projectName={selectedProject.name}
-                  isRunning={selectedProject.status === 'online'}
-                  onStatusChange={refreshProjects}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">Select a project for actions</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -278,26 +221,14 @@ export default function DashboardPage() {
         {activeView === 'health' && (
           <div className="flex flex-col h-full overflow-hidden">
             <div className="border-b p-6 bg-background">
-              <h1 className="text-3xl font-bold">System Health & Monitoring</h1>
+              <h1 className="text-3xl font-bold">Diagnostics & Monitoring</h1>
               <p className="text-muted-foreground mt-1">
-                Monitor system resources, NGINX configuration, and process management
+                Monitor ports, processes, system health, and infrastructure
               </p>
             </div>
 
             <div className="flex-1 overflow-auto p-6">
-              <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                {/* Left column */}
-                <div className="space-y-6">
-                  <HealthDashboard />
-                  <NginxPortsManager />
-                </div>
-
-                {/* Right column */}
-                <div className="space-y-6">
-                  <PM2ProcessList />
-                  <ZombieProcessKiller />
-                </div>
-              </div>
+              <DiagnosticsTabs />
             </div>
           </div>
         )}

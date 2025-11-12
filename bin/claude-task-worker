@@ -1,0 +1,72 @@
+#!/bin/bash
+# Claude Task Worker - Poll et exécute les tâches assignées à Claude
+
+BUILDER_DIR="/home/pilote/projet/primaire/BUILDER"
+FRONTEND_DIR="$BUILDER_DIR/frontend"
+LOG_FILE="$BUILDER_DIR/logs/task-worker.log"
+
+# Créer logs dir si n'existe pas
+mkdir -p "$BUILDER_DIR/logs"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Fonction pour checker les tâches pending
+check_pending_tasks() {
+  cd "$FRONTEND_DIR"
+
+  # Query DB via Node.js pour éviter psql dependencies
+  node -e "
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+async function checkTasks() {
+  try {
+    const tasks = await prisma.taskManager.findMany({
+      where: {
+        status: 'todo',
+        assignee: 'claude'
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' }
+      ]
+    });
+
+    if (tasks.length > 0) {
+      console.log(JSON.stringify(tasks));
+    }
+
+    await prisma.\$disconnect();
+  } catch (error) {
+    console.error('Error checking tasks:', error);
+    await prisma.\$disconnect();
+    process.exit(1);
+  }
+}
+
+checkTasks();
+  "
+}
+
+log "🤖 Claude Task Worker started"
+
+while true; do
+  # Check pending tasks
+  TASKS=$(check_pending_tasks 2>/dev/null)
+
+  if [ -n "$TASKS" ]; then
+    TASK_COUNT=$(echo "$TASKS" | jq '. | length')
+    log "📋 Found $TASK_COUNT pending task(s)"
+
+    # Log tâches trouvées
+    echo "$TASKS" | jq -r '.[] | "  - [\(.priority)] \(.title) (ID: \(.id))"' | tee -a "$LOG_FILE"
+
+    # TODO: Ici Claude sera notifié via webhook ou check ce log
+    # Pour l'instant on log juste
+  fi
+
+  # Wait 30 seconds
+  sleep 30
+done

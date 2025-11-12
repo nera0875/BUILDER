@@ -1,0 +1,82 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  log      = ["query", "info", "warn", "error"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model KanbanTask {
+  id          String    @id @default(cuid())
+  columnId    String
+  title       String
+  description String?
+  priority    String // low, medium, high
+  assignee    String?
+  dueDate     DateTime?
+  progress    Int       @default(0)
+  attachments Int       @default(0)
+  comments    Int       @default(0)
+  users       Json      @default("[]")
+  order       Int       @default(0) // Order within column
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // ✅ Relation bidirectionnelle
+  column KanbanColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@index([columnId])
+  @@index([order])
+}
+
+model KanbanColumn {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ✅ Relation inverse
+  tasks KanbanTask[]
+
+  @@index([order])
+}
+
+model TodoItem {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    String // low, medium, high
+  status      String // backlog, todo, in-progress, done, canceled
+  tags        String[]
+  subtasks    Json      @default("[]")
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([priority])
+}
+
+model TaskManager {
+  id        String   @id @default(cuid())
+  title     String
+  status    String // backlog, todo, in-progress, done, canceled
+  label     String // bug, feature, documentation
+  priority  String // low, medium, high
+  assignee  String?  @default("claude") // claude or user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([label])
+  @@index([priority])
+  @@index([assignee])
+}

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Activity, AlertCircle, CheckCircle } from 'lucide-react'
+import { Activity, CheckCircle } from 'lucide-react'
 
 export function HealthDashboard() {
   return (

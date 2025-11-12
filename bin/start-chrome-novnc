@@ -25,6 +25,7 @@ pkill -f "Xvfb :${DISPLAY_NUM}" 2>/dev/null || true
 pkill -f "x11vnc.*:${DISPLAY_NUM}" 2>/dev/null || true
 pkill -f "google-chrome.*remote-debugging" 2>/dev/null || true
 pkill -f "websockify.*${NOVNC_PORT}" 2>/dev/null || true
+pkill fluxbox 2>/dev/null || true
 sleep 2
 
 # Start Xvfb (virtual display)
@@ -32,6 +33,12 @@ echo -e "${BLUE}Starting Xvfb on display :${DISPLAY_NUM}...${NC}"
 Xvfb :${DISPLAY_NUM} -screen 0 ${RESOLUTION} >/dev/null 2>&1 &
 XVFB_PID=$!
 sleep 2
+
+# Start Fluxbox window manager
+echo -e "${BLUE}Starting Fluxbox window manager...${NC}"
+DISPLAY=:${DISPLAY_NUM} fluxbox >/dev/null 2>&1 &
+FLUXBOX_PID=$!
+sleep 1
 
 # Start Chrome with remote debugging
 echo -e "${BLUE}Starting Chrome with remote debugging on port ${CDP_PORT}...${NC}"
@@ -81,8 +88,9 @@ echo "  Chrome DevTools MCP will connect to: localhost:${CDP_PORT}"
 echo ""
 echo "Process PIDs:"
 echo "  Xvfb: $XVFB_PID"
+echo "  Fluxbox: $FLUXBOX_PID"
 echo "  Chrome: $CHROME_PID"
 echo "  x11vnc: $VNC_PID"
 echo "  noVNC: $NOVNC_PID"
 echo ""
-echo "To stop all: pkill -f 'Xvfb :${DISPLAY_NUM}' && pkill -f google-chrome && pkill -f websockify"
+echo "To stop all: pkill -f 'Xvfb :${DISPLAY_NUM}' && pkill -f google-chrome && pkill fluxbox && pkill -f websockify"

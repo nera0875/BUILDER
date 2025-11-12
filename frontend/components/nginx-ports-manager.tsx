@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Globe, Trash2 } from 'lucide-react'
+import { Button as _Button } from '@/components/ui/button'
+import { Globe } from 'lucide-react'
 
 interface PortMapping {
   port: number

@@ -1,26 +1,29 @@
-# Project Context
+# Project Context - BUILDER Dashboard
 
-> **Living Document** - Mis à jour automatiquement par Executor après chaque feature
+> **Living Document** - Updated by EXECUTOR after each feature
 >
-> Inspiré de : Netflix Architecture Notebooks, Vercel Monorepo Structure
+> Last updated: 2025-01-12
 
 ---
 
 ## Stack Technique
 
 ### Frontend
-- Framework: *(à définir au premier projet)*
-- UI Library: *(à définir)*
-- Styling: *(à définir)*
+- Framework: **Next.js 16** (App Router)
+- UI Library: **shadcn/ui** (57 components)
+- Styling: **Tailwind CSS**
+- State: React Server Components + Client Components
+- Drag & Drop: **@dnd-kit**
 
 ### Backend
-- Language: *(à définir au premier projet)*
-- Framework: *(à définir)*
-- Database: *(à définir)*
+- Platform: **Node.js**
+- Database: **PostgreSQL** (port 5434)
+- ORM: *(pas encore utilisé - à définir si besoin)*
+- Process Manager: **PM2**
 
 ### DevOps
-- Deployment: *(à définir)*
-- CI/CD: *(à définir)*
+- Deployment: **PM2** (local VPS)
+- Monitoring: Diagnostics dashboard (ports, systemd, PM2)
 
 ---
 
@@ -29,50 +32,107 @@
 ### Structure Fichiers
 
 ```
-/
-├── (structure sera générée au premier projet)
+frontend/
+├── app/
+│   ├── layout.tsx (root layout)
+│   └── dashboard/
+│       └── page.tsx (main dashboard)
+├── components/
+│   ├── ui/ (shadcn 57 composants READ-ONLY)
+│   ├── sidebar-nav.tsx
+│   ├── project-console.tsx
+│   ├── pm2-process-list.tsx
+│   ├── diagnostics-*.tsx (4 composants)
+│   └── project-*.tsx (3 composants)
+└── lib/
+    └── utils.ts (cn helper)
 ```
 
-### Routes/Endpoints
+### Routes/Pages
 
-*Aucune route définie*
+**Existantes:**
+- `/` → Dashboard principal (project list + sidebar)
+- `/dashboard` → Même que `/`
+
+**Sidebar Navigation:**
+- Dashboard (active)
+- Project Console (logs streaming SSE)
+- Diagnostics (ports, systemd, PM2, VNC)
 
 ### Composants Clés
 
-*Aucun composant créé*
+**Dashboard:**
+- `sidebar-nav.tsx` - Navigation sidebar principale
+- `pm2-process-list.tsx` - Liste projets PM2
+- `project-console.tsx` - SSE logs streaming
+- `project-actions.tsx` - Actions projet (stop/restart)
+- `new-project-dialog.tsx` - Création projet
+
+**Diagnostics:**
+- `diagnostics-overview.tsx` - Vue d'ensemble système
+- `diagnostics-tabs.tsx` - Tabs diagnostics
+- `diagnostics-ports.tsx` - Scan ports TCP/UDP
+- `systemd-services.tsx` - Services Linux
+- `vnc-viewer.tsx` - VNC remote display
+
+**shadcn/ui (57 composants READ-ONLY):**
+- dialog, sheet, tabs, card, button, input, etc.
 
 ---
 
 ## Conventions Établies
 
 ### Frontend
-- *(Conventions seront définies selon stack choisi)*
+- **Imports:** `@/components/*`, `@/lib/*`
+- **Client Components:** `"use client"` directive (drag-drop, SSE, interactions)
+- **Server Components:** Default (data fetching)
+- **Styling:** Tailwind utilities uniquement
+- **UI Base:** shadcn/ui (JAMAIS modifier components/ui/)
 
-### Backend
-- *(Conventions seront définies selon stack choisi)*
+### Routes API
+- `/api/projects` - CRUD projets PM2
+- `/api/logs/[project]` - SSE streaming logs
+- `/api/health/*` - Endpoints diagnostics (ports, docker, systemd)
 
-### Database
-- *(Conventions seront définies selon stack choisi)*
+### Data Fetching
+- Server Actions: *(pas encore utilisé)*
+- API Routes: Fetch côté client
 
 ---
 
 ## Dépendances Importantes
 
-*Aucune dépendance installée*
+**Core:**
+- next@16.x
+- react@19.x
+- tailwindcss@4.x
+
+**UI:**
+- @radix-ui/* (38 packages - shadcn base)
+- @dnd-kit/* (drag & drop)
+- lucide-react (icons)
+
+**Utilities:**
+- clsx, tailwind-merge (cn helper)
+- class-variance-authority (variants)
+- zod (validation - installé mais pas utilisé)
 
 ---
 
 ## État Projet
 
 - **Créé**: 2025-01-10
-- **Dernière mise à jour**: 2025-01-10
-- **Features actives**: 0
-- **Composants**: 0
-- **Routes**: 0
+- **Dernière mise à jour**: 2025-01-12
+- **Features actives**: Dashboard + Console + Diagnostics
+- **Composants**: 15 (hors shadcn/ui)
+- **Routes**: 1 page + 3 API routes groups
 
 ---
 
 ## Notes
 
-Ce fichier est automatiquement mis à jour par Executor.
-Ne pas modifier manuellement sauf ajout de notes importantes.
+- Dashboard fonctionnel avec PM2 integration
+- Sidebar toujours visible (navigation persistante)
+- Console SSE real-time logs
+- Diagnostics system monitoring complet
+- **NEXT:** Ajouter apps Kanban/Todo/Tasks avec PostgreSQL

@@ -1,0 +1,29 @@
+{
+  "name": "mcp-ssh-server",
+  "version": "1.0.0",
+  "description": "MCP Server with SSH backend for Claude.ai Connectors",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "keywords": ["mcp", "ssh", "claude", "streamable-http"],
+  "author": "Builder System",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "express": "^4.21.2",
+    "ssh2": "^1.17.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "@types/ssh2": "^1.15.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

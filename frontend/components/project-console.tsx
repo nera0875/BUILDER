@@ -3,23 +3,30 @@
 import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { X, Trash2, ChevronsDown, ChevronsUp } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Trash2, ChevronsDown, ChevronsUp, Server, Globe } from 'lucide-react'
+import { type BrowserLog } from '@/lib/browser-console'
 
 interface ProjectConsoleProps {
   projectName: string
 }
+
+type ConsoleSource = 'backend' | 'frontend'
 
 export function ProjectConsole({ projectName }: ProjectConsoleProps) {
   const [logs, setLogs] = useState<string[]>([])
   const [filter, setFilter] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+  const [source, setSource] = useState<ConsoleSource>('backend')
   const scrollRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
 
-  // SSE Connection for real-time logs
+  // Backend SSE Connection
   useEffect(() => {
-    setLogs([`[${new Date().toISOString()}] Connecting to ${projectName} logs...`])
+    if (source !== 'backend') return
+
+    setLogs([`[${new Date().toISOString()}] Connecting to ${projectName} backend logs...`])
 
     const eventSource = new EventSource(`/api/logs/${projectName}/stream`)
     eventSourceRef.current = eventSource
@@ -45,7 +52,39 @@ export function ProjectConsole({ projectName }: ProjectConsoleProps) {
       eventSource.close()
       eventSourceRef.current = null
     }
-  }, [projectName])
+  }, [projectName, source])
+
+  // Frontend Browser Console Capture (from iframe via postMessage)
+  useEffect(() => {
+    if (source !== 'frontend') return
+
+    setLogs([`[${new Date().toISOString()}] Listening for ${projectName} console...`])
+    setIsConnected(true)
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'BROWSER_CONSOLE_LOG') {
+        const log: BrowserLog = event.data.log
+        // Only show logs from current project
+        if (log.projectName === projectName || !log.projectName) {
+          setLogs(prev => [...prev, formatBrowserLog(log)])
+        }
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+
+    return () => {
+      window.removeEventListener('message', handleMessage)
+    }
+  }, [source, projectName])
+
+  const formatBrowserLog = (log: BrowserLog) => {
+    const prefix = `[${log.timestamp}] [${log.level.toUpperCase()}]`
+    if (log.stack) {
+      return `${prefix} ${log.message}\n${log.stack}`
+    }
+    return `${prefix} ${log.message}`
+  }
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -64,15 +103,15 @@ export function ProjectConsole({ projectName }: ProjectConsoleProps) {
 
   const getLogColor = (log: string) => {
     if (log.includes('[ERROR]') || log.includes('ERROR') || log.includes('error')) {
-      return 'text-red-400'
+      return 'text-red-500'
     }
     if (log.includes('[WARN]') || log.includes('WARN') || log.includes('warning')) {
-      return 'text-yellow-400'
+      return 'text-yellow-600'
     }
     if (log.includes('✓') || log.includes('Ready') || log.includes('success')) {
-      return 'text-green-400'
+      return 'text-green-600'
     }
-    return 'text-slate-300'
+    return 'text-foreground'
   }
 
   return (
@@ -82,6 +121,24 @@ export function ProjectConsole({ projectName }: ProjectConsoleProps) {
         <div className="flex items-center gap-3">
           <span className="font-semibold">Console - {projectName}</span>
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} title={isConnected ? 'Connected' : 'Disconnected'} />
+          <div className="flex gap-1">
+            <Badge
+              variant={source === 'backend' ? 'default' : 'outline'}
+              className="cursor-pointer text-xs"
+              onClick={() => setSource('backend')}
+            >
+              <Server className="h-3 w-3 mr-1" />
+              Backend
+            </Badge>
+            <Badge
+              variant={source === 'frontend' ? 'default' : 'outline'}
+              className="cursor-pointer text-xs"
+              onClick={() => setSource('frontend')}
+            >
+              <Globe className="h-3 w-3 mr-1" />
+              Frontend
+            </Badge>
+          </div>
           <span className="text-xs text-muted-foreground">
             {filteredLogs.length} {filteredLogs.length === 1 ? 'line' : 'lines'}
           </span>
@@ -119,7 +176,7 @@ export function ProjectConsole({ projectName }: ProjectConsoleProps) {
 
       {/* Console Body */}
       {isOpen && (
-        <div className="h-[calc(100%-3rem)] overflow-y-auto bg-black p-3 font-mono text-xs">
+        <div className="h-[calc(100%-3rem)] overflow-y-auto bg-card p-3 font-mono text-xs">
           {filteredLogs.length === 0 ? (
             <p className="text-muted-foreground">No logs available to display</p>
           ) : (

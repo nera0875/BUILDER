@@ -45,7 +45,7 @@
 
 | Component | Path | Type | Dependencies | Purpose |
 |-----------|------|------|--------------|---------|
-| sidebar-nav.tsx | components/ | Client | Sheet, Button, ScrollArea | Navigation principale sidebar |
+| sidebar-nav.tsx | components/ | Client | Link, Button, ScrollArea | Navigation principale + Apps links (with Next.js Link) |
 | project-console.tsx | components/ | Client | Card, Badge, ScrollArea | SSE logs streaming real-time |
 | pm2-process-list.tsx | components/ | Server | Table, Badge | Liste projets PM2 |
 | project-actions.tsx | components/ | Client | Button, DropdownMenu | Actions projet (stop/restart/delete) |
@@ -55,8 +55,11 @@
 | diagnostics-ports.tsx | components/ | Server | Table, Badge | Scan ports TCP/UDP |
 | systemd-services.tsx | components/ | Server | Table, Badge | Services Linux monitoring |
 | vnc-viewer.tsx | components/ | Client | Card | VNC remote display |
+| todo-detail-sheet.tsx | components/features/todo/ | Client | Sheet, Badge, Checkbox, Textarea | Todo detail panel avec subtasks, comments, attachments |
+| kanban-board.tsx | components/features/kanban/ | Client | @dnd-kit, Card, Badge | Kanban board drag-drop interface |
+| todo-list.tsx | components/features/todo/ | Client | @dnd-kit, StatusTabs, TodoItem | Todo list with drag-drop reordering |
 
-**Total:** 10 custom components
+**Total:** 13 custom components
 
 ---
 
@@ -97,7 +100,15 @@
 | Route | File | Type | Purpose |
 |-------|------|------|---------|
 | / | app/page.tsx | Server | Redirect → /dashboard |
-| /dashboard | app/dashboard/page.tsx | Server | Dashboard principal (PM2 projects) |
+| /dashboard | app/dashboard/page.tsx | Client | Dashboard principal (PM2 projects + client-side navigation) |
+| /dashboard/apps/kanban | app/dashboard/apps/kanban/page.tsx | Server | Kanban board app |
+| /dashboard/apps/todo | app/dashboard/apps/todo/page.tsx | Server | Todo list app |
+| /dashboard/apps/tasks | app/dashboard/apps/tasks/page.tsx | Server | Tasks manager app |
+
+### Layout Routes
+| Route | File | Purpose |
+|-------|------|---------|
+| /dashboard/apps | app/dashboard/apps/layout.tsx | Shared layout with sidebar for all apps |
 
 ### API Routes
 | Endpoint | File | Method | Purpose |
@@ -114,13 +125,19 @@
 ## Data Models & Database
 
 ### Database Status
-- **ORM:** ❌ Pas encore configuré (Prisma prévu)
-- **PostgreSQL:** Port 5434 configuré
-- **Migrations:** ❌ Pas encore créées
+- **ORM:** ✅ Prisma 6.19.0 configuré
+- **PostgreSQL:** Port 5433 configuré (builder_dashboard)
+- **Migrations:** ✅ Schema synchronisé
 
-### Models (Prévus)
-- Aucun model créé actuellement
-- Structure prévue: `prisma/schema.prisma`
+### Models (Actuels)
+| Model | Fields | Purpose |
+|-------|--------|---------|
+| KanbanTask | id, columnId, title, description, priority, assignee, dueDate, progress, attachments, comments, users, order | Kanban tasks management |
+| KanbanColumn | id, title, order | Kanban columns |
+| TodoItem | id, title, description, dueDate, priority, status, tags, subtasks, completed, completedAt | Todo items |
+| TaskManager | id, title, status, label, priority, **assignee**, createdAt, updatedAt | Task management with Claude/User assignment |
+
+**NEW:** TaskManager.assignee field (claude \| user) added with index
 
 ---
 
@@ -181,7 +198,17 @@ import { myAction } from "@/app/actions/my-actions"
 <form action={myAction}>...</form>
 ```
 
-**Status:** ❌ Pas encore utilisé (prévu pour apps)
+**Status:** ✅ Utilisé (tasks-actions.ts créé)
+
+**Available Actions:**
+- `app/actions/tasks-actions.ts`: CRUD TaskManager
+  - `getTasks(filters?)`: Récupère tasks avec filtres (status, label, priority, **assignee**)
+  - `createTask(data)`: Crée nouvelle task (assignee par défaut: "claude")
+  - `updateTask(id, data)`: Modifie task existante
+  - `deleteTask(id)`: Supprime task par ID
+  - `bulkDeleteTasks(ids[])`: Supprime multiple tasks
+- `app/actions/kanban-actions.ts`: Kanban board operations
+- `app/actions/todo-actions.ts`: Todo list operations
 
 ### API Routes Pattern
 ```tsx
@@ -216,10 +243,11 @@ export async function GET(request: NextRequest) {
 - [x] Docker containers monitoring
 - [x] VNC viewer integration
 
-### Apps (TODO)
-- [ ] Kanban board (drag-drop tasks)
-- [ ] Todo list (subtasks support)
-- [ ] Tasks manager (filters, priorities)
+### Apps (✅ Navigation Fixed)
+- [x] Kanban board (drag-drop tasks) - Navigation fixed with Next.js Link
+- [x] Todo list (subtasks support) - Navigation fixed with Next.js Link
+- [x] Tasks manager (filters, priorities) - Navigation fixed with Next.js Link
+- [x] Sidebar persistence - Layout pattern applied
 
 ---
 
@@ -260,7 +288,7 @@ export async function GET(request: NextRequest) {
 
 ## Performance Metrics
 
-- **Total Components:** 10 custom (+ 57 shadcn/ui)
+- **Total Components:** 11 custom (+ 57 shadcn/ui)
 - **Total Routes:** 1 page + 6 API routes
 - **Total Dependencies:** 67 packages (12 core, 38 @radix-ui, 17 utilities)
 - **Bundle Size:** (À mesurer après build)
@@ -294,7 +322,11 @@ export async function GET(request: NextRequest) {
 | Date | Action | By | Files Changed |
 |------|--------|-----|--------------|
 | 2025-01-12 14:45 | Initial inventory created | orchestrator | inventory.md |
+| 2025-11-12 15:30 | Added TaskManager Server Actions | executor+backend | app/actions/tasks-actions.ts |
+| 2025-11-12 16:45 | Added TodoDetailSheet component (COPY+ADAPT) | executor+frontend | components/features/todo/todo-detail-sheet.tsx |
+| 2025-11-12 17:00 | Added TaskManager.assignee field (claude \| user) | executor+database | prisma/schema.prisma, app/actions/tasks-actions.ts |
+| 2025-11-12 18:15 | Fixed sidebar navigation persistence for Apps | executor+frontend | components/sidebar-nav.tsx, app/dashboard/apps/layout.tsx |
 
 ---
 
-**Next Update:** Après intégration apps Kanban/Todo/Tasks
+**Next Update:** Après implémentation UI pour filtrer par assignee

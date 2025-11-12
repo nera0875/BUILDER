@@ -13,17 +13,11 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Loader2, Check, AlertCircle } from 'lucide-react'
+import { Plus, Loader2, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface NewProjectDialogProps {
   onSuccess: () => void
-}
-
-interface ProgressStep {
-  step: string
-  message: string | { percent?: number; elapsed?: number }
-  status: 'progress' | 'success' | 'error' | 'warning' | 'complete'
 }
 
 interface CompletedSteps {
@@ -75,8 +69,6 @@ export function NewProjectDialog({ onSuccess }: NewProjectDialogProps) {
         throw new Error('Stream not available')
       }
 
-      let projectData: any = null
-
       while (true) {
         const { done, value } = await reader.read()
 
@@ -123,8 +115,6 @@ export function NewProjectDialog({ onSuccess }: NewProjectDialogProps) {
                   const projectInfo = typeof data.message === 'string'
                     ? JSON.parse(data.message)
                     : data.message
-
-                  projectData = projectInfo
 
                   // Show success toast
                   toast({

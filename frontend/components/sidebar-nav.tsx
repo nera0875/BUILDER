@@ -1,18 +1,19 @@
 'use client'
 
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   FolderOpen,
   TestTube,
-  ScrollText,
-  Settings,
   Activity,
-  FileText,
-  LayoutDashboard
+  LayoutDashboard,
+  Kanban,
+  CheckSquare,
+  ListTodo
 } from 'lucide-react'
 
-export type NavItemId = 'projects' | 'devtools' | 'logs' | 'actions' | 'health' | 'diagnostics'
+export type NavItemId = 'projects' | 'devtools' | 'health' | 'diagnostics' | 'kanban' | 'todo' | 'tasks'
 
 interface NavItem {
   id: NavItemId
@@ -32,8 +33,12 @@ const navItems: NavItem[] = [
   { id: 'projects', label: 'Projects', icon: FolderOpen },
   { id: 'devtools', label: 'DevTools', icon: TestTube },
   { id: 'health', label: 'Diagnostics', icon: Activity },
-  { id: 'logs', label: 'Logs', icon: FileText, href: '/logs' },
-  { id: 'actions', label: 'Actions', icon: Settings },
+]
+
+const appItems: NavItem[] = [
+  { id: 'kanban', label: 'Kanban Board', icon: Kanban, href: '/dashboard/apps/kanban' },
+  { id: 'todo', label: 'Todo List', icon: CheckSquare, href: '/dashboard/apps/todo' },
+  { id: 'tasks', label: 'Tasks Manager', icon: ListTodo, href: '/dashboard/apps/tasks' },
 ]
 
 export function SidebarNav({
@@ -42,20 +47,6 @@ export function SidebarNav({
   selectedProjectName,
   selectedProjectStatus
 }: SidebarNavProps) {
-  const getStatusVariant = (status?: string) => {
-    switch (status) {
-      case 'online':
-        return 'default'
-      case 'stopped':
-        return 'secondary'
-      case 'error':
-        return 'destructive'
-      case 'not_deployed':
-      default:
-        return 'outline'
-    }
-  }
-
   const getStatusLabel = (status?: string) => {
     switch (status) {
       case 'online':
@@ -120,6 +111,31 @@ export function SidebarNav({
               </Button>
             )
           })}
+        </div>
+
+        <div className="mt-6 pt-4 border-t">
+          <p className="text-xs font-semibold text-muted-foreground px-3 mb-2">Apps</p>
+          <div className="space-y-1">
+            {appItems.map(item => {
+              const Icon = item.icon
+              const isActive = activeView === item.id
+
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href!}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    'hover:bg-accent hover:text-accent-foreground',
+                    isActive && 'bg-accent text-accent-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </div>
         </div>
       </nav>
 

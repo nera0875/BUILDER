@@ -32,15 +32,26 @@ allowed-tools: Bash, Read, Write, Edit
 
 ---
 
-## Credentials PostgreSQL VPS (HARDCODÉS)
+## PostgreSQL VPS Architecture (RÈGLES STRICTES)
 
-**Instance PostgreSQL Production:**
+### Instances PostgreSQL Disponibles
+
+**❌ NE PAS UTILISER:**
+- Port **5432**: Container Docker `agi_postgres` (réservé projet AGI uniquement)
+- Port **5434**: ~~Ancien container mcp-memory~~ (SUPPRIMÉ - n'existe plus)
+
+**✅ UTILISER UNIQUEMENT:**
+- Port **5433**: Container Docker `blv-postgres` (TOUS les projets BUILDER/BLV/etc.)
+
+### Credentials PostgreSQL VPS (HARDCODÉS)
+
+**Instance PostgreSQL Production (Port 5433):**
 
 ```bash
 # VPS IP
 HOST="89.116.27.88"
 
-# Port (instance pentester)
+# Port (UNIQUE pour tous projets)
 PORT="5433"
 
 # User
@@ -53,7 +64,104 @@ PASSWORD="Voiture789"
 DEFAULT_DB="postgres"
 ```
 
-**⚠️ RÈGLE ABSOLUE:** Ces credentials sont pour **instance port 5433** uniquement.
+**⚠️ RÈGLES ABSOLUES:**
+
+1. **TOUJOURS utiliser port 5433** (jamais 5432, jamais 5434)
+2. **TOUJOURS utiliser user pentester** (jamais pilote, jamais postgres)
+3. **TOUJOURS utiliser password Voiture789**
+4. **JAMAIS hardcoder DATABASE_URL dans schema.prisma** (toujours `env("DATABASE_URL")`)
+5. **1 projet = 1 database dédiée** (isolation complète)
+
+### Databases Existantes (Port 5433)
+
+Au 2025-01-12, databases créées:
+- `postgres` (default PostgreSQL)
+- `builder_dashboard` (BUILDER frontend - Kanban/Todo/Tasks)
+- `blv` (Projet BLV)
+- `memory` (MCP gestion - Memory RAG + PostgreSQL tools)
+- `NEURODOPA` (Projet neuro)
+- `admin_kanban_db` (Admin kanban)
+- `task_timer_db` (Task timer)
+
+**Vérifier avant créer:**
+```typescript
+// ✅ OBLIGATOIRE: Utiliser MCP gestion
+mcp__gestion__postgresql_list_databases()
+```
+
+---
+
+## 🔧 MCP Gestion PostgreSQL Tools (RÉFÉRENCE)
+
+**Tools disponibles (9 outils):**
+
+### 1. List Databases
+```typescript
+mcp__gestion__postgresql_list_databases()
+// Retourne: {"databases": [...], "count": N}
+```
+
+### 2. Create Database
+```typescript
+mcp__gestion__postgresql_create_database("nom_projet_db")
+// owner par défaut: "pentester" (correct)
+// Retourne: "✓ Database created: nom_projet_db (owner: pentester)"
+```
+
+### 3. Get Connection URL
+```typescript
+mcp__gestion__postgresql_get_connection_url("nom_projet_db")
+// Defaults: pentester/Voiture789@89.116.27.88:5433
+// Retourne: {
+//   "database": "nom_projet_db",
+//   "url": "postgresql://pentester:Voiture789@89.116.27.88:5433/nom_projet_db",
+//   "env_format": "DATABASE_URL=\"postgresql://...\""
+// }
+```
+
+### 4. Get Schema
+```typescript
+mcp__gestion__postgresql_get_schema("nom_projet_db")
+// Retourne: {"tables": [{name, columns}], "table_count": N}
+```
+
+### 5. Query (SELECT)
+```typescript
+mcp__gestion__postgresql_query("nom_projet_db", "SELECT * FROM users LIMIT 5")
+// Retourne: {"rows": [...], "count": N}
+```
+
+### 6. Execute (DDL/DML)
+```typescript
+mcp__gestion__postgresql_execute("nom_projet_db",
+  "CREATE TABLE users (id SERIAL PRIMARY KEY, email TEXT)")
+// ⚠️ Dangereux - Utilise avec précaution
+```
+
+### 7. Create Table (Helper)
+```typescript
+mcp__gestion__postgresql_create_table("nom_projet_db", "users",
+  "id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT, created_at TIMESTAMP DEFAULT NOW()")
+// Retourne: "✓ Table users created"
+```
+
+### 8. Insert Row (Helper)
+```typescript
+mcp__gestion__postgresql_insert_row("nom_projet_db", "users",
+  {"email": "admin@example.com", "name": "Admin User"})
+// Retourne: {"inserted_row": {...}, "message": "✓ Row inserted"}
+```
+
+### 9. Validate Connection
+```typescript
+mcp__gestion__postgresql_validate_connection("nom_projet_db")
+// Retourne: {"version": "PostgreSQL 16.10", "connected": true}
+```
+
+**⚠️ IMPORTANT:**
+- Tous les tools utilisent automatiquement `pentester/Voiture789@89.116.27.88:5433`
+- Pas besoin de passer credentials manuellement
+- MCP = Source de vérité (évite erreurs credentials)
 
 ---
 
@@ -100,62 +208,192 @@ Database: project2_db
 
 ---
 
-## Workflow Création Database
+---
 
-### Phase 1: Check Database Existe
+## ⚠️ WORKFLOW OBLIGATOIRE (Non-Negotiable)
 
-**AVANT créer, TOUJOURS vérifier si existe déjà:**
+### Phase 0: MCP Gestion (TOUJOURS EN PREMIER)
+
+**❌ INTERDIT:**
+- Créer database via `createdb` CLI
+- Créer database via SQL direct (`psql -c "CREATE DATABASE"`)
+- Écrire credentials manuellement dans `.env`
+
+**✅ OBLIGATOIRE:**
+- **TOUJOURS utiliser MCP gestion tools**
+- MCP = Source de vérité PostgreSQL
+- MCP garantit conventions (port 5433, user pentester, UTF8)
+
+**Workflow strict:**
+
+```typescript
+// STEP 1: Check si database existe
+mcp__gestion__postgresql_list_databases()
+
+Response:
+{
+  "databases": ["postgres", "builder_dashboard", "blv", "memory", ...],
+  "count": 8
+}
+
+// STEP 2: SI database absente → Créer
+mcp__gestion__postgresql_create_database("nom_projet_db")
+
+Response:
+{
+  "success": true,
+  "database": "nom_projet_db",
+  "owner": "pentester",
+  "message": "✓ Database created: nom_projet_db"
+}
+
+// OU SI existe déjà:
+{
+  "info": "ℹ️ Database already exists: nom_projet_db"
+}
+
+// STEP 3: Obtenir DATABASE_URL
+mcp__gestion__postgresql_get_connection_url("nom_projet_db")
+
+Response:
+{
+  "database": "nom_projet_db",
+  "url": "postgresql://pentester:Voiture789@89.116.27.88:5433/nom_projet_db",
+  "env_format": "DATABASE_URL=\"postgresql://pentester:Voiture789@89.116.27.88:5433/nom_projet_db\""
+}
+
+// STEP 4: Écrire .env automatiquement
+Write .env avec DATABASE_URL exacte du MCP
+```
+
+**Avantages MCP:**
+- ✅ Credentials toujours corrects (port 5433, pentester)
+- ✅ Check existence automatique (pas de duplication)
+- ✅ Format DATABASE_URL garanti cohérent
+- ✅ Historique centralisé (MCP logs toutes opérations)
+
+---
+
+### Phase 1: Validation Prisma Schema (AVANT db push)
+
+**❌ INTERDIT:**
+- Écrire `schema.prisma` puis direct `npx prisma db push`
+- Skiper validation TypeScript
+- Ignorer erreurs Prisma
+
+**✅ OBLIGATOIRE:**
+- Valider schema AVANT push
+- Check TypeScript compile
+- Fix erreurs AVANT continuer
+
+**Workflow validation:**
 
 ```bash
-# Liste toutes les databases
-PGPASSWORD="Voiture789" psql -h 89.116.27.88 -p 5433 -U pentester -d postgres -c "\l" | grep -i "nom_projet"
+# STEP 1: Écrire schema.prisma selon conventions
+# (voir section Prisma Schema Generation plus bas)
 
-# Si existe déjà
-# → Demander user: "Database existe, utiliser existante ou recréer?"
+# STEP 2: Valider syntax Prisma
+npx prisma validate
+
+# Output attendu:
+# ✓ Schema is valid
+
+# STEP 3: Format auto schema
+npx prisma format
+
+# STEP 4: Générer Prisma Client
+npx prisma generate
+
+# Output attendu:
+# ✓ Generated Prisma Client
+
+# STEP 5: Check TypeScript compile (zero errors)
+npx tsc --noEmit
+
+# Output attendu:
+# (vide = 0 errors)
+
+# STEP 6: SEULEMENT si TOUT passe → Push DB
+npx prisma db push
+
+# Output attendu:
+# 🚀 Your database is now in sync with your Prisma schema
+```
+
+**SI erreurs TypeScript:**
+```bash
+npx tsc --noEmit
+
+# Exemple erreur:
+# error TS2339: Property 'column' does not exist on type 'KanbanTask'
+
+# → FIX: Ajouter relation dans schema.prisma
+# → Re-valider (STEP 2-6)
+# → JAMAIS passer à l'étape suivante avec erreurs
 ```
 
 ---
 
-### Phase 2: Créer Database
+### Phase 2: Relations Prisma (TOUJOURS Bidirectionnelles)
 
-**Commande EXACTE (testée et fonctionnelle):**
+**❌ INTERDIT:**
 
-```bash
-# Créer nouvelle database
-PGPASSWORD="Voiture789" psql \
-  -h 89.116.27.88 \
-  -p 5433 \
-  -U pentester \
-  -d postgres \
-  -c "CREATE DATABASE nom_projet_db ENCODING 'UTF8';"
+```prisma
+// ❌ Foreign key SANS relation
+model KanbanTask {
+  id       String @id @default(cuid())
+  columnId String  // ← Juste FK, pas de relation
+}
 
-# Vérifier création
-PGPASSWORD="Voiture789" psql \
-  -h 89.116.27.88 \
-  -p 5433 \
-  -U pentester \
-  -d postgres \
-  -c "\l" | grep nom_projet_db
-
-# Si succès
-echo "✅ Database nom_projet_db créée"
+model KanbanColumn {
+  id String @id @default(cuid())
+  // ← Pas de tasks[] relation
+}
 ```
 
-**En cas d'erreur "database exists":**
-```bash
-# Option 1: Utiliser existante (recommandé)
-echo "Database existe déjà, réutilisation"
+**Problème:** TypeScript compile mais runtime crashes:
+```typescript
+// ❌ CRASH runtime
+const column = await prisma.kanbanColumn.findUnique({
+  include: { tasks: true }  // Property 'tasks' does not exist
+})
+```
 
-# Option 2: Drop et recréer (DANGER - demander confirmation user)
-PGPASSWORD="Voiture789" psql \
-  -h 89.116.27.88 \
-  -p 5433 \
-  -U pentester \
-  -d postgres \
-  -c "DROP DATABASE nom_projet_db;"
+**✅ CORRECT:**
 
-# Puis recréer
-PGPASSWORD="Voiture789" psql \
+```prisma
+// ✅ Relations bidirectionnelles complètes
+model KanbanTask {
+  id       String       @id @default(cuid())
+  columnId String
+  column   KanbanColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@index([columnId])  // ✅ Index sur FK (performance)
+}
+
+model KanbanColumn {
+  id    String       @id @default(cuid())
+  tasks KanbanTask[]  // ✅ Relation inverse
+}
+```
+
+**Résultat:** TypeScript + Runtime safe:
+```typescript
+// ✅ Type-safe et fonctionne
+const column = await prisma.kanbanColumn.findUnique({
+  where: { id: columnId },
+  include: { tasks: true }  // ✓ TypeScript valide + runtime OK
+})
+```
+
+**RÈGLE ABSOLUE:**
+```
+SI foreign key exists (columnId, userId, taskId, etc.)
+ALORS relation MUST exist (column, user, task)
+ET relation inverse MUST exist (tasks[], columns[], etc.)
+```
+
+---
   -h 89.116.27.88 \
   -p 5433 \
   -U pentester \
@@ -726,3 +964,226 @@ npm run prisma:seed
 **Version**: 1.0.0
 **Last updated**: 2025-01-11
 **Maintained by**: EXECUTOR agent
+
+---
+
+## 📋 EXEMPLE COMPLET: Projet avec Database
+
+**Scenario:** User demande "Crée dashboard blog avec PostgreSQL"
+
+### STEP 1: MCP Database Setup (5 secondes)
+
+```typescript
+// 1.1 Check databases existantes
+const dbList = mcp__gestion__postgresql_list_databases()
+// → 9 databases trouvées, pas de "blog_dashboard_db"
+
+// 1.2 Créer database
+const dbCreate = mcp__gestion__postgresql_create_database("blog_dashboard_db")
+// → ✓ Database created: blog_dashboard_db (owner: pentester)
+
+// 1.3 Obtenir DATABASE_URL
+const dbUrl = mcp__gestion__postgresql_get_connection_url("blog_dashboard_db")
+// → {
+//     "url": "postgresql://pentester:Voiture789@89.116.27.88:5433/blog_dashboard_db",
+//     "env_format": "DATABASE_URL=\"postgresql://pentester:Voiture789@89.116.27.88:5433/blog_dashboard_db\""
+//   }
+
+// 1.4 Écrire .env
+Write(".env", `
+DATABASE_URL="postgresql://pentester:Voiture789@89.116.27.88:5433/blog_dashboard_db"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="$(openssl rand -base64 32)"
+`)
+```
+
+**Résultat Phase 0:** ✅ Database créée + .env configuré (credentials garantis corrects)
+
+---
+
+### STEP 2: Prisma Schema (30 secondes)
+
+```prisma
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")  // ✅ Jamais hardcodé
+}
+
+// ✅ Relations bidirectionnelles OBLIGATOIRES
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  published   Boolean   @default(false)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([published])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  posts     Post[]   // ✅ Relation inverse
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id    String @id @default(cuid())
+  name  String @unique
+  posts Post[] // ✅ Relation inverse
+}
+```
+
+**Résultat Phase 1:** ✅ Schema écrit avec relations bidirectionnelles
+
+---
+
+### STEP 3: Validation Prisma (10 secondes)
+
+```bash
+# 3.1 Valider syntax
+npm run prisma:validate
+# → ✅ Schema is valid
+
+# 3.2 Générer client
+npm run prisma:generate
+# → ✅ Generated Prisma Client
+
+# 3.3 Check TypeScript (OBLIGATOIRE)
+npm run typecheck
+# → (vide = 0 errors) ✅
+
+# 3.4 Push schema vers DB
+npm run prisma:push
+# → ✅ Your database is now in sync
+```
+
+**SI erreurs TypeScript détectées:**
+```bash
+npm run typecheck
+# → error TS2339: Property 'author' does not exist
+
+# FIX: Ajouter relation manquante dans schema.prisma
+# Re-run validation complète
+```
+
+**Résultat Phase 2:** ✅ Schema validé + DB synchronisée (0 errors garantis)
+
+---
+
+### STEP 4: Vérification MCP (5 secondes)
+
+```typescript
+// Vérifier schema créé
+const schema = mcp__gestion__postgresql_get_schema("blog_dashboard_db")
+// → {
+//     "tables": [
+//       {"name": "Post", "columns": [...]},
+//       {"name": "User", "columns": [...]},
+//       {"name": "Category", "columns": [...]}
+//     ],
+//     "table_count": 3
+//   }
+
+// Vérifier connexion
+const conn = mcp__gestion__postgresql_validate_connection("blog_dashboard_db")
+// → {"connected": true, "version": "PostgreSQL 16.10"}
+```
+
+**Résultat Phase 3:** ✅ Database opérationnelle + tables créées
+
+---
+
+### STEP 5: Seed Data (optionnel, 10 secondes)
+
+```typescript
+// Utiliser MCP pour seed rapide
+mcp__gestion__postgresql_insert_row("blog_dashboard_db", "User", {
+  "email": "admin@blog.com",
+  "name": "Admin"
+})
+// → {"inserted_row": {"id": "...", "email": "admin@blog.com", ...}}
+
+mcp__gestion__postgresql_insert_row("blog_dashboard_db", "Category", {
+  "name": "Technology"
+})
+// → {"inserted_row": {"id": "...", "name": "Technology"}}
+
+// OU utiliser Prisma seed script (recommandé pour prod)
+npm run prisma:seed
+```
+
+---
+
+## ✅ Résultat Final
+
+**Temps total:** ~60 secondes  
+**Erreurs runtime:** 0 (détection compile-time)  
+**Credentials:** Garantis corrects (MCP)  
+**Relations:** Type-safe (bidirectionnelles)  
+**Validation:** Automatique (prebuild hook)
+
+**Database prête pour:**
+- Server Actions CRUD
+- API Routes
+- Frontend components
+- Production deployment
+
+---
+
+## 🚨 Erreurs Courantes Évitées
+
+**Sans MCP Workflow:**
+```bash
+# ❌ Credentials incorrects
+DATABASE_URL="postgresql://pilote:xxx@localhost:5434/..."
+# → Runtime error: Authentication failed
+
+# ❌ Relations manquantes
+model Post {
+  authorId String  // Pas de relation
+}
+# → Runtime error: Property 'author' does not exist
+
+# ❌ Skip validation
+npx prisma db push  // Direct sans typecheck
+# → Build errors découverts tard
+```
+
+**Avec MCP Workflow:**
+```typescript
+// ✅ Credentials garantis
+mcp__gestion__postgresql_get_connection_url("...")
+// → postgresql://pentester:Voiture789@89.116.27.88:5433/...
+
+// ✅ Relations forcées
+model Post {
+  authorId String
+  author   User @relation(...)  // Obligatoire
+}
+
+// ✅ Validation automatique
+npm run validate  // Avant build
+# → 0 errors ou STOP
+```
+
+---
+
+**Version:** 2.0.0 (MCP Integration)  
+**Last updated:** 2025-01-12  
+**Maintained by:** EXECUTOR agent + MCP gestion
+

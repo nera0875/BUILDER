@@ -11,7 +11,7 @@ interface ChangePortResponse {
 }
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ name: string }> }
 ): Promise<NextResponse<ChangePortResponse>> {
   try {
@@ -131,7 +131,7 @@ export async function POST(
  * Returns information about port change capability
  */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ name: string }> }
 ): Promise<NextResponse> {
   try {

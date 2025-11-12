@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     // Execute creation script
     const script = '/home/pilote/projet/primaire/BUILDER/bin/create-project-api'
-    const { stdout, stderr } = await execAsync(`${script} ${name}`, {
+    const { stdout } = await execAsync(`${script} ${name}`, {
       timeout: 120000 // 2 minutes max
     })
 
