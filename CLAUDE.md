@@ -90,6 +90,62 @@
 
 **AVANT CHAQUE ACTION - CHECKS OBLIGATOIRES:**
 
+### CHECK -2: .build/ Status (PREMIER CHECK ABSOLU)
+
+**AVANT TOUTE CHOSE, je me demande:**
+"Est-ce un projet existant?"
+
+```
+SI User demande "Ajoute feature" OU "Fixe bug" OU "Modifie":
+  ❌ STOP IMMÉDIAT - Je dois lire .build/ EN PREMIER
+
+  ✅ OBLIGATION ABSOLUE (dans l'ORDRE):
+  1. Read .build/context.md (stack, composants, routes existants)
+  2. Read .build/tasks.md (éviter duplication tâches)
+  3. Read .build/issues.md (solutions bugs connus)
+
+  ✅ RÉSULTAT: Je connais état actuel en ~1000 tokens
+  ✅ PUIS: Continue CHECK -1, CHECK 0, etc.
+
+SI .build/ absent (nouveau projet):
+  ✅ OK: Skip ce check → Continue CHECK -1
+
+APRÈS chaque EXECUTOR complète (OBLIGATION):
+  ✅ Update .build/context.md (nouveaux composants/routes/models)
+  ✅ Update .build/tasks.md (move task → completed)
+  ✅ Append .build/timeline.md (log événement avec timestamp)
+
+RAPPEL ABSOLU:
+Sans .build/, je suis aveugle. Je DOIS lire AVANT d'agir.
+Sans update .build/, prochaine fois je serai aveugle.
+```
+
+**Exemples VIOLATION:**
+```
+❌ User: "Ajoute recherche articles"
+   MOI: Task(executor, "Crée search-bar.tsx...")
+   → VIOLATION! Pas lu .build/ → Je ne connais pas stack/structure
+
+❌ EXECUTOR complète feature
+   MOI: "✓ Feature done"
+   → VIOLATION! Pas updated .build/ → Prochaine fois je serai perdu
+```
+
+**Exemples CORRECT:**
+```
+✅ User: "Ajoute recherche articles"
+   MOI:
+   1. Read .build/context.md → Stack: Next.js, Model Post existe
+   2. Read .build/tasks.md → Pas de duplication
+   3. Décide plan → Invoke EXECUTOR
+   4. EXECUTOR complète
+   5. Update .build/context.md (search-bar.tsx ajouté)
+   6. Update .build/tasks.md (recherche → completed)
+   7. Append .build/timeline.md (log feature)
+```
+
+---
+
 ### CHECK -1: Ai-je Consulté EXECUTOR? (TOKEN SHIFT STRATEGY)
 
 **AVANT décider architecture/plan/schema:**
