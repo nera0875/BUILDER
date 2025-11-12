@@ -101,18 +101,20 @@ SI User demande "Ajoute feature" OU "Fixe bug" OU "Modifie":
 
   ✅ OBLIGATION ABSOLUE (dans l'ORDRE):
   1. Read .build/context.md (stack, composants, routes existants)
-  2. Read .build/architecture.md (module graph + dépendances)
-  3. Read .build/tasks.md (éviter duplication tâches)
-  4. Read .build/issues.md (solutions bugs connus)
+  2. Read .build/inventory.md (🆕 INVENTAIRE CODE - anti-duplication)
+  3. Read .build/architecture.md (module graph + dépendances)
+  4. Read .build/tasks.md (éviter duplication tâches)
+  5. Read .build/issues.md (solutions bugs connus)
 
-  ✅ RÉSULTAT: Je connais état actuel + module dependencies en ~1500 tokens
-  ✅ PUIS: Continue CHECK -1, CHECK 0, etc.
+  ✅ RÉSULTAT: Je connais état actuel + inventaire code + dependencies en ~2000 tokens
+  ✅ PUIS: Continue CHECK -1.5, CHECK -1, CHECK 0, etc.
 
 SI .build/ absent (nouveau projet):
-  ✅ OK: Skip ce check → Continue CHECK -1
+  ✅ OK: Skip ce check → Continue CHECK -1.5
 
 APRÈS chaque EXECUTOR complète (OBLIGATION):
   ✅ Update .build/context.md (nouveaux composants/routes/models)
+  ✅ Update .build/inventory.md (🆕 nouvel inventaire détaillé)
   ✅ Update .build/architecture.md (si nouveau module créé)
   ✅ Update .build/tasks.md (move task → completed)
   ✅ Append .build/timeline.md (log événement avec timestamp)
@@ -120,6 +122,7 @@ APRÈS chaque EXECUTOR complète (OBLIGATION):
 RAPPEL ABSOLU:
 Sans .build/, je suis aveugle. Je DOIS lire AVANT d'agir.
 Sans update .build/, prochaine fois je serai aveugle.
+inventory.md = SOURCE DE VÉRITÉ pour anti-duplication.
 ```
 
 **Exemples VIOLATION:**
@@ -148,6 +151,72 @@ Sans update .build/, prochaine fois je serai aveugle.
 
 ---
 
+### CHECK -1.5: Source Code Scan (SI source externe mentionnée)
+
+**TRIGGERS (détection automatique):**
+- User dit "intègre depuis X"
+- User mentionne GitHub URL
+- User mentionne path local externe (/tmp/, autre projet)
+- User dit "j'ai copié", "clone", "utilise ce code"
+
+**WORKFLOW RAPIDE (<10s):**
+
+```
+1. **Parse user request → Extract source location:**
+   - GitHub URL → Bash clone dans /tmp/[repo-name]
+   - Path local → Vérifier existe avec Glob
+
+2. **Quick scan structure (batch 3-5s):**
+   Glob: [source]/components/**/*.tsx
+   Glob: [source]/lib/**/*.ts
+   Glob: [source]/**/*[keywords]*.{ts,tsx}
+   → Résultat: Liste fichiers pertinents
+
+3. **Read top files (3-5 max, 2-3s):**
+   Read: Top 3 fichiers les plus pertinents
+   → Analyse: Taille, dépendances, réutilisabilité
+
+4. **Décision stratégique:**
+   SI module complet + compatible stack:
+     ✅ COPY + ADAPT strategy
+     ✅ Gain: 30-50% temps, code production-ready
+
+   SI code partiel ou ancien:
+     ⚠️ ADAPT PARTS strategy
+     ⚠️ Réutiliser patterns, recréer reste
+
+   SI incompatible stack:
+     ❌ CREATE from scratch
+     ❌ Trop de refactoring nécessaire
+
+5. **Documentation décision:**
+   ## Source Code Analysis
+   - Location: /tmp/shadcn-kit-temp
+   - Modules trouvés: kanban.tsx (1036L), todo-list.tsx (320L)
+   - Strategy: COPY + ADAPT
+   - Reason: Production-ready avec @dnd-kit intégré
+   - Gain estimé: 40% temps vs create from scratch
+
+6. **Pass à EXECUTOR MODE: CONSULT:**
+   Instruction inclut:
+   "Source analysis completed.
+   Strategy: COPY + ADAPT
+   Source: /tmp/shadcn-kit-temp
+   Files: kanban.tsx, todo-list.tsx, tasks.tsx
+   Target: Adapter pour PostgreSQL backend"
+```
+
+**RÉSULTAT:**
+- EXECUTOR reçoit contexte complet (source + stratégie)
+- Plan optimal avec réutilisation maximale
+- Pas de duplication code existant externe
+
+**SKIP SI:**
+- Pas de source externe mentionnée
+- Feature interne projet seulement
+
+---
+
 ### CHECK -1: Ai-je Consulté EXECUTOR? (TOKEN SHIFT STRATEGY)
 
 **AVANT décider architecture/plan/schema:**
@@ -167,15 +236,16 @@ User demande feature complexe OU nouveau projet:
 
 STRATÉGIE TOKEN (pas de scan):
 - EXECUTOR context = jetable (nouvelle instance)
-- EXECUTOR lit .build/ (context.md + architecture.md) = ~1500 tokens
+- EXECUTOR lit .build/ (context.md + inventory.md + architecture.md) = ~2000 tokens
 - MOI context = critique (conversation longue, pas compaction)
 - MOI ne lis RIEN sauf résultat EXECUTOR
 - Shift complexité chez EXECUTOR → Retour JSON léger
 
 SOURCE VÉRITÉ:
 - .build/context.md = État actuel (stack, composants, routes)
+- .build/inventory.md = 🆕 Inventaire code détaillé (anti-duplication)
 - .build/architecture.md = Module graph (qui dépend de quoi)
-- Skills = Conventions (Next.js, Prisma patterns)
+- Skills = Conventions (Next.js, Prisma patterns) + Anti-dup logic
 
 RAPPEL ABSOLU:
 Je n'ai AUCUN skill chargé. EXECUTOR a 11 skills.

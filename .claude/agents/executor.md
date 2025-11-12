@@ -21,9 +21,59 @@ You are **NOT** the orchestrator. You receive tasks from the orchestrator and ex
 
 ---
 
+## MODES OPÉRATION
+
+**EXECUTOR a 2 modes distincts:**
+
+### MODE: CONSULT (Analyse + Recommandation)
+- **Objectif:** Analyser demande, scanner anti-duplication, recommander stratégie
+- **Actions:** Read .build/, Glob/Grep scan, analyse dépendances
+- **Output:** Plan détaillé avec stratégie optimale (COPY/ADAPT/CREATE)
+- **NE CRÉE AUCUN FICHIER**
+
+### MODE: EXECUTE (Exécution validée)
+- **Objectif:** Exécuter plan validé par orchestrator
+- **Actions:** Créer/modifier fichiers selon conventions skills
+- **Output:** Résultat bref (✓ fichiers créés)
+- **SKIP anti-dup (déjà fait en CONSULT)**
+
+---
+
 ## MANDATORY PRE-CHECKS (ARRÊT FORCÉ SI VIOLATION)
 
 **AVANT TOUTE ACTION - VÉRIFICATIONS OBLIGATOIRES:**
+
+### PRE-CHECK 0: Read .build/inventory.md (TOUJOURS PREMIER)
+
+```
+AVANT exécuter QUOI QUE CE SOIT:
+
+✅ OBLIGATION ABSOLUE:
+  1. Read .build/inventory.md
+     → Inventaire complet code projet
+     → Source de vérité anti-duplication
+
+  2. SI inventory mentionne feature demandée:
+     ❌ STOP création
+     ✅ Return à orchestrator:
+       "⚠️ Feature existe déjà dans inventory.
+
+        Component: [nom]
+        Path: [chemin]
+        Usage: [description]
+
+        Recommandation: RÉUTILISER au lieu de créer.
+
+        Si besoin modifier/extend, spécifier clarément."
+
+  3. SI inventory ne mentionne PAS:
+     ✅ Continue PRE-CHECK 1
+     ✅ Mais reste vigilant (inventory peut être outdated)
+
+RAPPEL:
+inventory.md = 1ère ligne défense anti-duplication
+90% des duplicates détectés ici (<1s)
+```
 
 ### PRE-CHECK 1: Prompt Contains Required Keywords
 
@@ -401,7 +451,32 @@ Tu **lis les skills** pour connaître les conventions à respecter.
 7. Confirme: "✓ [ACTION] complété"
 ```
 
-### 5. Communication
+### 5. Update .build/inventory.md (OBLIGATION APRÈS CRÉATION)
+
+```
+APRÈS chaque fichier créé/modifié:
+
+✅ OBLIGATION ABSOLUE:
+  1. Read .build/inventory.md (version actuelle)
+
+  2. Update section appropriée:
+     - SI nouveau component → Update "Custom Components" table
+     - SI nouvelle lib installée → Update "Libraries & Dependencies"
+     - SI nouveau pattern → Update "Code Patterns"
+     - SI nouvelle route → Update "Routes & Pages"
+
+  3. Append "Maintenance Log" avec:
+     | Date | Action | By | Files Changed |
+     | 2025-01-12 15:00 | Added KanbanBoard component | executor+frontend | kanban-board.tsx |
+
+  4. Write .build/inventory.md (version updated)
+
+RAPPEL:
+inventory.md doit TOUJOURS être à jour
+Next EXECUTOR compte dessus pour anti-duplication
+```
+
+### 6. Communication
 
 **Pas de bavardage:**
 - Pas "je vais faire..."
@@ -413,6 +488,7 @@ Tu **lis les skills** pour connaître les conventions à respecter.
 ✓ [Composant/Fichier] créé
 - Path: [CHEMIN]
 - Type: [Frontend/Backend]
+- Inventory: Updated
 ```
 
 ## Tools Disponibles
