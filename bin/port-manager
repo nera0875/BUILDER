@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# Port Manager - Automatic port assignment CLI
+# Usage: port-manager <command> [args]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/port-utils.sh"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Show usage
+show_usage() {
+  echo "Port Manager - Automatic port assignment system"
+  echo ""
+  echo "Usage: port-manager <command> [args]"
+  echo ""
+  echo "Commands:"
+  echo "  assign <project-name>    Assign next free port to project"
+  echo "  release <project-name>   Release port from project"
+  echo "  get <project-name>       Get assigned port for project"
+  echo "  list                     List all port assignments"
+  echo "  cleanup                  Remove assignments for deleted projects"
+  echo ""
+  echo "Examples:"
+  echo "  port-manager assign my-app        # Assigns port 3001 (or next free)"
+  echo "  port-manager get my-app           # Shows: 3001"
+  echo "  port-manager list                 # Shows all assignments"
+  echo "  port-manager cleanup              # Removes deleted projects from registry"
+  echo ""
+}
+
+# Command: assign
+cmd_assign() {
+  local project_name="$1"
+
+  if [ -z "$project_name" ]; then
+    echo -e "${RED}Error: Project name required${NC}"
+    echo "Usage: port-manager assign <project-name>"
+    exit 1
+  fi
+
+  # Check if project already has port
+  local existing_port=$(get_project_port "$project_name")
+  if [ -n "$existing_port" ]; then
+    echo -e "${YELLOW}Project '$project_name' already has port: $existing_port${NC}"
+    echo "$existing_port"
+    exit 0
+  fi
+
+  # Find next free port
+  local next_port=$(find_next_free_port)
+
+  # Assign port
+  assign_port "$project_name" "$next_port"
+
+  echo -e "${GREEN}✓ Assigned port $next_port to '$project_name'${NC}"
+  echo "$next_port"
+}
+
+# Command: release
+cmd_release() {
+  local project_name="$1"
+
+  if [ -z "$project_name" ]; then
+    echo -e "${RED}Error: Project name required${NC}"
+    echo "Usage: port-manager release <project-name>"
+    exit 1
+  fi
+
+  # Check if project has port
+  local existing_port=$(get_project_port "$project_name")
+  if [ -z "$existing_port" ]; then
+    echo -e "${YELLOW}Project '$project_name' has no assigned port${NC}"
+    exit 0
+  fi
+
+  # Release port
+  release_port "$project_name"
+
+  echo -e "${GREEN}✓ Released port $existing_port from '$project_name'${NC}"
+}
+
+# Command: get
+cmd_get() {
+  local project_name="$1"
+
+  if [ -z "$project_name" ]; then
+    echo -e "${RED}Error: Project name required${NC}"
+    echo "Usage: port-manager get <project-name>"
+    exit 1
+  fi
+
+  local port=$(get_project_port "$project_name")
+
+  if [ -z "$port" ]; then
+    echo -e "${YELLOW}No port assigned to '$project_name'${NC}"
+    exit 1
+  fi
+
+  echo "$port"
+}
+
+# Command: list
+cmd_list() {
+  local registry_path=$(get_registry_path)
+  init_registry
+
+  echo -e "${BLUE}Port Assignments:${NC}"
+  echo ""
+
+  # Pretty print registry
+  node -e "
+    const fs = require('fs');
+    try {
+      const registry = JSON.parse(fs.readFileSync('$registry_path', 'utf8'));
+      const entries = Object.entries(registry).sort((a, b) => a[1] - b[1]);
+
+      if (entries.length === 0) {
+        console.log('  (No ports assigned)');
+      } else {
+        const maxNameLen = Math.max(...entries.map(([name]) => name.length));
+
+        entries.forEach(([project, port]) => {
+          const padding = ' '.repeat(maxNameLen - project.length);
+          console.log(\`  \${project}\${padding}  →  \${port}\`);
+        });
+      }
+    } catch(e) {
+      console.log('  Error reading registry: ' + e.message);
+    }
+  "
+
+  echo ""
+}
+
+# Command: cleanup
+cmd_cleanup() {
+  echo -e "${BLUE}Cleaning up deleted projects...${NC}"
+  cleanup_deleted_projects
+  echo -e "${GREEN}✓ Cleanup complete${NC}"
+}
+
+# Main command router
+COMMAND="$1"
+shift || true
+
+case "$COMMAND" in
+  assign)
+    cmd_assign "$@"
+    ;;
+  release)
+    cmd_release "$@"
+    ;;
+  get)
+    cmd_get "$@"
+    ;;
+  list)
+    cmd_list "$@"
+    ;;
+  cleanup)
+    cmd_cleanup "$@"
+    ;;
+  help|--help|-h|"")
+    show_usage
+    ;;
+  *)
+    echo -e "${RED}Error: Unknown command '$COMMAND'${NC}"
+    echo ""
+    show_usage
+    exit 1
+    ;;
+esac

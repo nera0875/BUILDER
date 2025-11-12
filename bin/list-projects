@@ -3,6 +3,10 @@
 # BUILDER - List All Projects
 # Usage: list-projects
 
+# Cleanup deleted projects from port registry
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/port-manager" cleanup 2>/dev/null
+
 echo "📋 BUILDER Projects"
 echo ""
 

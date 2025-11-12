@@ -1,0 +1,59 @@
+#!/bin/bash
+# Check Template Status - Show current template state
+
+BUILT_DIR="/opt/builder/template-ready"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}=== Builder Template Status ===${NC}\n"
+
+if [ -d "$BUILT_DIR" ]; then
+  echo -e "${GREEN}✓ Pre-built template exists${NC}\n"
+
+  # Show metadata
+  if [ -f "$BUILT_DIR/.built-at" ]; then
+    cat "$BUILT_DIR/.built-at"
+    echo ""
+  fi
+
+  # Show size
+  echo "Location: $BUILT_DIR"
+  echo "Size: $(du -sh $BUILT_DIR | cut -f1)"
+
+  # Check essential directories
+  echo ""
+  echo -e "${BLUE}Contents:${NC}"
+  [ -d "$BUILT_DIR/.next" ] && echo "  ✓ .next/ (built)" || echo "  ✗ .next/ (missing)"
+  [ -d "$BUILT_DIR/node_modules" ] && echo "  ✓ node_modules/ (installed)" || echo "  ✗ node_modules/ (missing)"
+  [ -d "$BUILT_DIR/components" ] && echo "  ✓ components/ (shadcn ui)" || echo "  ✗ components/ (missing)"
+  [ -d "$BUILT_DIR/app" ] && echo "  ✓ app/ (Next.js)" || echo "  ✗ app/ (missing)"
+
+  # Component count
+  if [ -d "$BUILT_DIR/components/ui" ]; then
+    COMP_COUNT=$(ls -1 "$BUILT_DIR/components/ui" | wc -l)
+    echo "  ✓ $COMP_COUNT shadcn components"
+  fi
+
+  echo ""
+  echo -e "${GREEN}Status: Ready for instant project creation${NC}"
+  echo "New projects start in ~2-3s (no build needed)"
+
+else
+  echo -e "${YELLOW}⚠ Pre-built template not found${NC}\n"
+  echo "Location: $BUILT_DIR (does not exist)"
+  echo ""
+  echo -e "${RED}Impact:${NC}"
+  echo "  - New projects will build from scratch"
+  echo "  - Slower project creation (~20s build time)"
+  echo ""
+  echo -e "${BLUE}Solution:${NC}"
+  echo "  Run: rebuild-stack"
+  echo "  (First-time build takes ~30s)"
+fi
+
+echo ""

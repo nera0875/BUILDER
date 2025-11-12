@@ -1,0 +1,38 @@
+#!/bin/bash
+# Setup sudo password for automation (run once)
+
+SECRETS_DIR="/home/pilote/.secrets"
+SUDO_PASSWORD_FILE="$SECRETS_DIR/sudo-password"
+
+echo "=== Setup Sudo Password for Automation ==="
+echo ""
+echo "This will store your sudo password securely for automated tasks."
+echo "File: $SUDO_PASSWORD_FILE"
+echo "Permissions: 600 (owner read/write only)"
+echo ""
+
+# Prompt for password
+read -sp "Enter your sudo password: " password
+echo ""
+
+# Validate password works
+echo "$password" | sudo -S echo "Testing sudo access..." 2>/dev/null
+
+if [ $? -eq 0 ]; then
+  # Save password
+  echo "$password" > "$SUDO_PASSWORD_FILE"
+  chmod 600 "$SUDO_PASSWORD_FILE"
+  
+  echo ""
+  echo "✓ Sudo password saved successfully!"
+  echo "✓ File permissions: $(ls -l $SUDO_PASSWORD_FILE | awk '{print $1}')"
+  echo ""
+  echo "Automation is now enabled for:"
+  echo "- PM2 persistence setup"
+  echo "- System package installations"
+  echo "- Service management"
+else
+  echo ""
+  echo "✗ Invalid password or sudo access denied"
+  exit 1
+fi

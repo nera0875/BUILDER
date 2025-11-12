@@ -1,0 +1,105 @@
+#!/bin/bash
+# Test Nginx configuration validity
+# Usage: test-nginx-config
+
+set -e
+
+CONFIG_FILE="/tmp/builder-nginx.conf"
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}🧪 Testing Nginx Configuration${NC}"
+echo ""
+
+# Check config file exists
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo -e "${RED}✗ Config file not found: $CONFIG_FILE${NC}"
+  echo "Run: generate-nginx-config"
+  exit 1
+fi
+
+echo -e "${GREEN}✓${NC} Config file exists: $CONFIG_FILE"
+
+# Check file size
+FILE_SIZE=$(wc -c < "$CONFIG_FILE")
+if [ "$FILE_SIZE" -lt 100 ]; then
+  echo -e "${RED}✗ Config file too small (${FILE_SIZE} bytes)${NC}"
+  exit 1
+fi
+
+echo -e "${GREEN}✓${NC} Config file size: ${FILE_SIZE} bytes"
+
+# Check required sections
+REQUIRED_SECTIONS=(
+  "server {"
+  "listen 80 default_server"
+  "location /"
+  "proxy_pass http://localhost:9000"
+  "gzip on"
+  "location /health"
+)
+
+echo ""
+echo -e "${BLUE}Checking required sections...${NC}"
+
+for section in "${REQUIRED_SECTIONS[@]}"; do
+  if grep -q "$section" "$CONFIG_FILE"; then
+    echo -e "${GREEN}✓${NC} Found: $section"
+  else
+    echo -e "${RED}✗${NC} Missing: $section"
+    exit 1
+  fi
+done
+
+# Count project routes
+PROJECT_COUNT=$(grep -c "# Project:" "$CONFIG_FILE" || echo "0")
+echo ""
+echo -e "${GREEN}✓${NC} Project routes: $PROJECT_COUNT"
+
+# Show project URLs
+if [ "$PROJECT_COUNT" -gt 0 ]; then
+  echo ""
+  echo -e "${BLUE}Project URLs:${NC}"
+  grep "# Project:" "$CONFIG_FILE" | while read -r line; do
+    PROJECT_NAME=$(echo "$line" | sed 's/.*# Project: //')
+    echo "  - http://localhost/projects/$PROJECT_NAME"
+  done
+fi
+
+# Validate syntax manually (basic checks)
+echo ""
+echo -e "${BLUE}Validating syntax...${NC}"
+
+# Check balanced braces
+OPEN_BRACES=$(grep -o '{' "$CONFIG_FILE" | wc -l)
+CLOSE_BRACES=$(grep -o '}' "$CONFIG_FILE" | wc -l)
+
+if [ "$OPEN_BRACES" -eq "$CLOSE_BRACES" ]; then
+  echo -e "${GREEN}✓${NC} Braces balanced: $OPEN_BRACES open, $CLOSE_BRACES close"
+else
+  echo -e "${RED}✗${NC} Braces unbalanced: $OPEN_BRACES open, $CLOSE_BRACES close"
+  exit 1
+fi
+
+# Check semicolons on directives
+MISSING_SEMICOLONS=$(grep -E '^\s+(proxy_pass|proxy_set_header|rewrite|listen|server_name|gzip|expires|return)\s' "$CONFIG_FILE" | grep -v ';$' | wc -l)
+
+if [ "$MISSING_SEMICOLONS" -eq 0 ]; then
+  echo -e "${GREEN}✓${NC} All directives have semicolons"
+else
+  echo -e "${RED}✗${NC} Missing semicolons on $MISSING_SEMICOLONS directive(s)"
+  exit 1
+fi
+
+# Note about full test
+echo ""
+echo -e "${BLUE}ℹ${NC}  For full syntax test, run:"
+echo "  sudo nginx -t -c /etc/nginx/sites-available/builder"
+
+echo ""
+echo -e "${GREEN}✅ All tests passed!${NC}"
+echo ""
+echo "Ready to install:"
+echo "  install-nginx-config"

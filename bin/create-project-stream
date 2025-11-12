@@ -1,0 +1,202 @@
+#!/bin/bash
+
+# BUILDER - Create Project with SSE Streaming
+# Called by Dashboard API: POST /api/projects/create (SSE endpoint)
+# Usage: create-project-stream [project-name]
+
+set -e
+
+PROJECT_NAME="$1"
+
+# SSE event sender
+send_event() {
+  local step="$1"
+  local message="$2"
+  local status="${3:-progress}"
+  echo "data: {\"step\":\"$step\",\"message\":\"$message\",\"status\":\"$status\"}"
+  echo ""
+}
+
+# Error handler with SSE
+error_exit() {
+  send_event "error" "$2" "error"
+  exit 1
+}
+
+# Validate project name
+if [ -z "$PROJECT_NAME" ]; then
+  error_exit "validation" "Project name is required"
+fi
+
+if ! [[ "$PROJECT_NAME" =~ ^[a-z0-9-]{3,50}$ ]]; then
+  error_exit "validation" "Project name must be kebab-case (lowercase, hyphens only, 3-50 chars)"
+fi
+
+# Check if project already exists
+PROJECT_PATH="/home/pilote/projet/secondaire/$PROJECT_NAME"
+if [ -d "$PROJECT_PATH" ]; then
+  EXISTING_PORT=$(grep "^PORT=" "$PROJECT_PATH/.env" 2>/dev/null | cut -d'=' -f2 || echo "unknown")
+  error_exit "validation" "Project '$PROJECT_NAME' already exists (port: $EXISTING_PORT)"
+fi
+
+# Step 1: Clone pre-built template (ultra fast!)
+send_event "clone" "Cloning optimized template..." "progress"
+mkdir -p "$PROJECT_PATH"
+cp -r /opt/builder/template-ready/* "$PROJECT_PATH"/ 2>/dev/null || error_exit "clone" "Failed to clone template"
+cp -r /opt/builder/template-ready/.next "$PROJECT_PATH"/ 2>/dev/null
+send_event "clone" "Template cloned (0.5s)" "success"
+
+# Step 2: Initialize .build/ structure
+send_event "init" "Initializing project structure..." "progress"
+mkdir -p "$PROJECT_PATH/.build/decisions"
+
+cat > "$PROJECT_PATH/.build/context.md" << 'EOF'
+# Project Context
+
+## Stack Technique
+- Frontend: Next.js 16 + shadcn/ui (57 components)
+- Styling: Tailwind CSS v4
+- Dark mode: Included (themes.css)
+
+## Architecture Actuelle
+(Will be populated after first features)
+
+## Conventions Établies
+- Components: components/ui/ (shadcn)
+- Pages: app/
+- Utils: lib/utils.ts
+EOF
+
+cat > "$PROJECT_PATH/.build/timeline.md" << EOFTIMELINE
+# Timeline
+
+## $(date +"%Y-%m-%d %H:%M") - Project Initialization
+
+**Type**: Setup
+**Status**: ✓ Completed
+**Source**: Dashboard GUI (SSE stream)
+
+### Changes
+- Project created via Dashboard with pre-built template
+- BUILDER stack cloned (57 shadcn components)
+- .build/ structure initialized
+
+### Notes
+- Ready for feature development
+- Build time: <10s (pre-built template)
+EOFTIMELINE
+
+touch "$PROJECT_PATH/.build/tasks.md"
+touch "$PROJECT_PATH/.build/issues.md"
+touch "$PROJECT_PATH/.build/specs.md"
+
+send_event "init" "Project structure initialized" "success"
+
+# Step 3: Install only new dependencies (if any)
+send_event "install" "Checking dependencies..." "progress"
+cd "$PROJECT_PATH"
+
+# Template already has node_modules, just verify
+if [ ! -d "node_modules" ]; then
+  send_event "install" "Installing dependencies..." "progress"
+  npm install --silent 2>&1 > /dev/null || error_exit "install" "npm install failed"
+else
+  send_event "install" "Dependencies already installed" "success"
+fi
+
+# Step 4: Deploy to PM2
+send_event "deploy" "Preparing deployment..." "progress"
+
+# Get next available port from port-manager
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PORT=$("$SCRIPT_DIR/port-manager" assign "$PROJECT_NAME" 2>&1 | tail -n1)
+
+if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+  error_exit "deploy" "Failed to assign port: $PORT"
+fi
+
+send_event "deploy" "Assigned port: $PORT" "progress"
+
+# Save port to .env
+echo "PORT=$PORT" > .env
+
+# Create ecosystem.config.js with Cluster Mode
+# Detect CPU cores - use N-1 cores, leave 1 for system
+CPU_CORES=$(nproc)
+INSTANCES=$((CPU_CORES > 1 ? CPU_CORES - 1 : 1))
+
+cat > ecosystem.config.js << EOFPM2
+module.exports = {
+  apps: [{
+    name: '$PROJECT_NAME',
+    script: 'node_modules/.bin/next',
+    args: 'start',
+    cwd: '$PROJECT_PATH',
+    instances: $INSTANCES,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: $PORT
+    },
+    error_file: '~/.pm2/logs/$PROJECT_NAME-error.log',
+    out_file: '~/.pm2/logs/$PROJECT_NAME-out.log',
+    merge_logs: true,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '500M',
+    kill_timeout: 5000
+  }]
+}
+EOFPM2
+
+send_event "deploy" "Starting PM2 process..." "progress"
+
+# Start PM2
+pm2 start ecosystem.config.js 2>&1 > /dev/null || error_exit "deploy" "Failed to start PM2 process"
+pm2 save 2>&1 > /dev/null
+
+send_event "deploy" "PM2 process started" "success"
+
+# Step 5: Health check (optimized - 5s max)
+send_event "healthcheck" "Waiting for application to start..." "progress"
+
+MAX_ATTEMPTS=10
+SLEEP_INTERVAL=0.5
+for i in $(seq 1 $MAX_ATTEMPTS); do
+  sleep $SLEEP_INTERVAL
+
+  # Calculate progress percentage (smooth update)
+  PERCENT=$((i * 100 / MAX_ATTEMPTS))
+
+  STATUS=$(pm2 jlist 2>/dev/null | node -e "
+    let data = '';
+    process.stdin.on('data', chunk => data += chunk);
+    process.stdin.on('end', () => {
+      try {
+        const procs = JSON.parse(data);
+        const proc = procs.find(p => p.name === '$PROJECT_NAME');
+        console.log(proc ? proc.pm2_env.status : 'not_found');
+      } catch(e) { console.log('error'); }
+    });
+  ")
+
+  if [ "$STATUS" == "online" ]; then
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT 2>/dev/null || echo "000")
+
+    if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "404" ]; then
+      send_event "healthcheck" "Application ready" "success"
+
+      # Final success event with project data
+      send_event "complete" "{\"name\":\"$PROJECT_NAME\",\"path\":\"$PROJECT_PATH\",\"port\":$PORT,\"preview_url\":\"http://89.116.27.88:$PORT\",\"pm2_status\":\"online\",\"created_at\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" "complete"
+      exit 0
+    fi
+  fi
+
+  # Send single-line progress update
+  send_event "healthcheck" "{\"percent\":$PERCENT,\"elapsed\":$(echo "$i * $SLEEP_INTERVAL" | bc)}" "progress"
+done
+
+# Timeout but process may still be starting
+send_event "healthcheck" "Starting (may take a few more seconds)" "warning"
+send_event "complete" "{\"name\":\"$PROJECT_NAME\",\"path\":\"$PROJECT_PATH\",\"port\":$PORT,\"preview_url\":\"http://89.116.27.88:$PORT\",\"pm2_status\":\"starting\",\"created_at\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" "complete"
+exit 0

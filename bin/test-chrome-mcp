@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Test Chrome MCP with xvfb-run wrapper
+
+echo "Testing Chrome MCP with xvfb-run wrapper..."
+echo ""
+
+# Method 1: Direct navigation test
+echo "Method 1: Testing direct navigation..."
+xvfb-run -a --server-args="-screen 0 1920x1080x24" node -e "
+const puppeteer = require('puppeteer');
+(async () => {
+  try {
+    // Connect to existing Chrome instance
+    const browser = await puppeteer.connect({
+      browserWSEndpoint: 'ws://localhost:9222/devtools/browser/$(curl -s http://localhost:9222/json/version | grep -o '"webSocketDebuggerUrl":"[^"]*"' | cut -d'"' -f4 | cut -d'/' -f5-)',
+      defaultViewport: null
+    });
+
+    const pages = await browser.pages();
+    console.log('Connected! Found', pages.length, 'pages');
+
+    // Navigate to a test page
+    const page = pages[0] || await browser.newPage();
+    await page.goto('https://example.com');
+    console.log('Navigated to:', await page.url());
+
+    // Don't close browser - keep it running
+    console.log('Chrome is running at http://localhost:9222');
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+})();
+" 2>/dev/null || echo "Puppeteer not installed globally"
+
+# Method 2: Check if we can use the MCP with xvfb-run
+echo ""
+echo "Method 2: Checking MCP compatibility..."
+echo "Note: The chrome-devtools-mcp currently has a known limitation."
+echo "It cannot connect to existing Chrome instances and tries to launch its own."
+echo ""
+echo "Workaround options:"
+echo "1. Use Browserbase MCP (cloud-based solution)"
+echo "2. Use direct CDP commands via curl/websocket"
+echo "3. Wait for chrome-devtools-mcp fix (issue #140, #190 on GitHub)"
+echo ""
+echo "For now, Chrome is running with CDP enabled at: http://localhost:9222"
+echo "You can view it via NoVNC at: http://89.116.27.88:6081/vnc.html"

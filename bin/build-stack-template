@@ -1,0 +1,73 @@
+#!/bin/bash
+# Build Stack Template - Run once to create optimized template
+# Creates pre-built Next.js template at /opt/builder/template-ready
+
+set -e
+
+BUILDER_DIR="/home/pilote/projet/primaire/BUILDER"
+STACK_DIR="$BUILDER_DIR/.stack"
+BUILT_DIR="/opt/builder/template-ready"
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=== Building Optimized Template ===${NC}\n"
+
+# Check if .stack/ exists
+if [ ! -d "$STACK_DIR" ]; then
+  echo -e "${YELLOW}Error: $STACK_DIR not found${NC}"
+  exit 1
+fi
+
+# Clean old built version
+echo -e "${BLUE}[1/6]${NC} Cleaning old template..."
+sudo rm -rf "$BUILT_DIR"
+sudo mkdir -p "$BUILT_DIR"
+
+# Copy fresh .stack
+echo -e "${BLUE}[2/6]${NC} Copying .stack/ files..."
+sudo cp -r "$STACK_DIR/." "$BUILT_DIR/"
+sudo chown -R pilote:pilote "$BUILT_DIR"
+
+cd "$BUILT_DIR"
+
+# Install deps
+echo -e "${BLUE}[3/6]${NC} Installing dependencies..."
+npm install --silent
+
+# Build production
+echo -e "${BLUE}[4/6]${NC} Building Next.js production..."
+npm run build
+
+# Clean dev artifacts but keep essential build outputs
+echo -e "${BLUE}[5/6]${NC} Cleaning dev artifacts..."
+rm -rf .next/cache
+
+# Create metadata file
+echo -e "${BLUE}[6/6]${NC} Creating metadata..."
+cat > .built-at << EOF
+Built at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Builder version: 2.2.0
+Next.js version: $(node -p "require('./package.json').dependencies.next")
+Node version: $(node --version)
+EOF
+
+# Calculate size
+TEMPLATE_SIZE=$(du -sh "$BUILT_DIR" | cut -f1)
+
+echo ""
+echo -e "${GREEN}✓ Template built successfully!${NC}"
+echo ""
+echo "Location: $BUILT_DIR"
+echo "Size: $TEMPLATE_SIZE"
+echo "Build output: .next/ (ready for PM2)"
+echo "Dependencies: node_modules/ (pre-installed)"
+echo ""
+echo -e "${YELLOW}Usage:${NC}"
+echo "  New projects will now use this pre-built template"
+echo "  Start time: ~2-3s (vs 20s+ with build)"
+echo ""
+echo -e "${BLUE}Rebuild template:${NC} rebuild-stack"

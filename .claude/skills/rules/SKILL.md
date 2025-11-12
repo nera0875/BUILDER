@@ -10,13 +10,81 @@ allowed-tools: None
 
 ---
 
+## 🛡️ .build/ PROTECTION (VIOLATION = ARRÊT IMMÉDIAT)
+
+**RÈGLE ABSOLUE - NON NÉGOCIABLE:**
+
+### ❌ INTERDICTION TOTALE d'écrire dans .build/
+
+```
+AUCUN fichier .md à créer dans .build/ (sauf orchestrator)
+AUCUN log, tmp, test, guide, install
+AUCUNE documentation technique
+AUCUNE création de fichiers par AGENTS
+```
+
+**SEUL ORCHESTRATOR (Claude principal) peut écrire dans .build/**
+
+### ✅ WHITELIST .build/ (EXHAUSTIVE - ORCHESTRATOR uniquement)
+
+**Fichiers `.build/` orchestrator-only:**
+- `context.md` - État actuel (routes, composants, models, stack)
+- `timeline.md` - Historique append-only des actions
+- `tasks.md` - Todo dynamique (in progress, blocked, next)
+- `issues.md` - Bugs résolus + solutions documentées
+- `specs.md` - Plan stratégique du projet
+- `decisions/*.md` - ADRs numérotés (000-xxx.md, 001-xxx.md, etc)
+- `templates/*.md` - Templates uniquement (si besoin)
+
+**JAMAIS par agents (EXECUTOR, RESEARCHER, TESTER):**
+- ❌ `.build/context.md` (orchestrator only)
+- ❌ `.build/timeline.md` (orchestrator only)
+- ❌ `.build/issues.md` (orchestrator only)
+- ❌ `.build/decisions/*.md` (orchestrator only)
+- ❌ Aucun nouveau .md dans .build/
+
+### Où documenter CORRECTEMENT
+
+**SI agent besoin documenter:**
+```
+✅ Utilise `/home/pilote/projet/primaire/BUILDER/docs/`
+✅ Utilise `/tmp/builder-agents/` pour logs temporaires
+✅ Utilise bin/README.md pour CLI docs
+❌ JAMAIS dans .build/ (sauf orchestrator)
+```
+
+### SI violation détectée
+
+**Pseudo-code vérification (EXECUTOR responsable):**
+```
+IF trying_to_write_in_build_dir:
+  STOP IMMÉDIATEMENT
+
+  IF .md file:
+    RAISE ERROR "Violation: .build/ protection"
+    RETURN info_structurée à orchestrator
+    ORCHESTRATOR update .build/context.md après
+
+  IF log/tmp/guide:
+    REDIRECT à /tmp/builder-agents/ ou docs/
+```
+
+**Actions si violation détectée:**
+1. **STOP** immédiatement (pas de création fichier .build/)
+2. Return info structurée à ORCHESTRATOR
+3. ORCHESTRATOR update .build/context.md après
+4. Résultat: Info centralisée, ZÉRO pollution .build/
+
+---
+
 ## ❌ INTERDIT de créer
 
 ### Fichiers Documentation
-- `.md` SAUF `.build/*.md` (context, timeline, tasks, issues)
-- `.md` SAUF `.build/decisions/*.md` (ADRs uniquement)
-- README, GUIDE, ARCHITECTURE, WORKFLOW fichiers hasardeux
-- Documentation dispersée hors `.build/`
+- ❌ `.md` files (sauf orchestrator dans `.build/`)
+- ❌ AGENTS JAMAIS créer `.build/*.md` (violates .build/ protection)
+- ❌ README, GUIDE, ARCHITECTURE, WORKFLOW fichiers hasardeux
+- ❌ Documentation dispersée hors `.build/` (sauf orchestrator)
+- ✅ Agents: Return info structurée à orchestrator (orchestrator update .build/ après)
 
 ### Fichiers Configuration Non-Standards
 - `.json` SAUF package.json, tsconfig.json, components.json (standards projet)
@@ -131,28 +199,59 @@ projet/
 
 ---
 
+## 📁 Dossiers Autorisés par Type
+
+### Code Exécutable
+- ✅ `bin/` - Scripts CLI (agent peut créer si demandé)
+- ✅ `bin/lib/` - Helper scripts bash
+
+### Documentation (Agent Doit Éviter)
+- ✅ `/home/pilote/projet/primaire/BUILDER/docs/` - Docs techniques (si agent besoin documenter)
+- ✅ `bin/README.md` - CLI reference uniquement
+- ✅ `/tmp/builder-agents/` - Logs jetables temporaires
+
+### INTERDITS Absolus
+- ❌ `.build/` (orchectrator only - voir section protection ci-dessus)
+- ❌ Racine projet (sauf scripts bin/, config standards)
+- ❌ `.md` à la racine (sauf user demande explicitement README)
+
+### Directive Agents Stricte
+```
+SI agent besoin documenter infos:
+  ✅ Return info structurée (JSON/dict)
+  ✅ ORCHESTRATOR update .build/ après
+  ❌ JAMAIS créer .md agents
+  ❌ JAMAIS écrire dans .build/
+```
+
+---
+
 ## 🚫 Exemples Interdictions
 
-### ❌ Fichiers à NE JAMAIS créer (racine projet):
+### ❌ Fichiers à NE JAMAIS créer (agents):
 ```
-API_ROUTES.md                # → Mettre dans .build/docs/api-routes.md
-BACKEND_SETUP.md             # → Mettre dans .build/docs/backend-setup.md
-DEPLOYMENT.md                # → Mettre dans .build/docs/deployment.md
-FRONTEND_README.md           # → Mettre dans .build/docs/frontend-guide.md
-QUICK_START.md               # → Mettre dans .build/docs/quick-start.md
-PROJECT_STATUS.md            # → Mettre dans .build/context.md
-README.md                    # Sauf si user demande explicitement
-ARCHITECTURE.md              # → Mettre dans .build/decisions/
-WORKFLOW.md
-GUIDE.md
-SETUP.md
-setup-project.sh
-install.sh
-deploy.sh                    # Sauf si deployment script demandé
-test-matrix.md               # Pollution
-capabilities-guide.md        # Pollution
-system-architecture.md       # Pollution
-custom-config.json           # Non-standard
+API_ROUTES.md                # ❌ Return info à orchestrator → orchestrator update .build/context.md
+BACKEND_SETUP.md             # ❌ Return info à orchestrator → orchestrator update .build/
+DEPLOYMENT.md                # ❌ Return info à orchestrator → orchestrator update .build/context.md
+FRONTEND_README.md           # ❌ Return info à orchestrator → orchestrator update .build/
+QUICK_START.md               # ❌ Return info à orchestrator → orchestrator update .build/
+PROJECT_STATUS.md            # ❌ Orchestrator update .build/context.md uniquement
+README.md                    # ❌ Sauf si user demande explicitement (validation user)
+ARCHITECTURE.md              # ❌ Orchestrator create .build/decisions/xxx.md uniquement
+WORKFLOW.md                  # ❌ Return info → orchestrator update
+GUIDE.md                     # ❌ Return info → orchestrator update
+SETUP.md                     # ❌ Return info → orchestrator update
+setup-project.sh             # ❌ Sauf si user demande (validation user)
+install.sh                   # ❌ Sauf si user demande (validation user)
+deploy.sh                    # ❌ Sauf si user demande (validation user)
+test-matrix.md               # ❌ Pollution - interdite
+capabilities-guide.md        # ❌ Pollution - interdite
+system-architecture.md       # ❌ Pollution - interdite
+custom-config.json           # ❌ Non-standard - interdit
+.build/context.md            # ❌ AGENTS JAMAIS - orchestrator only
+.build/timeline.md           # ❌ AGENTS JAMAIS - orchestrator only
+.build/issues.md             # ❌ AGENTS JAMAIS - orchestrator only
+.build/decisions/*.md        # ❌ AGENTS JAMAIS - orchestrator only
 ```
 
 ### ✅ Fichiers autorisés:
@@ -273,10 +372,13 @@ Si doute sur fichier → **Demander user AVANT créer**
 
 ---
 
-**Version:** 1.2.0
-**Date:** 2025-01-11
+**Version:** 1.3.0
+**Date:** 2025-11-11
 **Application:** Obligatoire pour orchestrator + tous agents + tous skills
 **Changelog:**
+- v1.3.0: Add .build/ PROTECTION section (VIOLATION = ARRÊT IMMÉDIAT) - agents JAMAIS write .build/
+- v1.3.0: Add "Dossiers Autorisés par Type" with strict directory rules
+- v1.3.0: Clarify agent must return structured info, orchestrator update .build/ after
 - v1.2.0: Suppression `.build/docs/` (context.md suffit)
 - v1.2.0: Agents doivent return info structurée (pas créer .md)
 - v1.1.0: Enforcement strict avec exemples violations

@@ -1,0 +1,53 @@
+#!/bin/bash
+# Setup PM2 Persistence - Automatic with stored sudo password
+
+set -e
+
+# Source sudo helper
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/sudo-helper.sh"
+
+echo "=== PM2 Persistence Setup ==="
+echo ""
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+# Check if sudo password is configured
+if ! is_sudo_configured; then
+  echo -e "${RED}✗ Sudo password not configured${NC}"
+  echo ""
+  echo "Please run first: $SCRIPT_DIR/setup-sudo"
+  exit 1
+fi
+
+echo "This script will configure PM2 to auto-start on VPS reboot."
+echo ""
+
+# Step 1: Setup systemd service
+echo -e "${YELLOW}Step 1: Setting up PM2 systemd service...${NC}"
+sudo_exec env PATH=$PATH:/home/pilote/.nvm/versions/node/v20.19.5/bin /home/pilote/.nvm/versions/node/v20.19.5/lib/node_modules/pm2/bin/pm2 startup systemd -u pilote --hp /home/pilote
+
+if [ $? -eq 0 ]; then
+  echo -e "${GREEN}✓ PM2 systemd service configured${NC}"
+else
+  echo -e "${RED}✗ Failed to setup systemd service${NC}"
+  exit 1
+fi
+
+# Step 2: Save current PM2 list
+echo -e "${YELLOW}Step 2: Saving current PM2 process list...${NC}"
+pm2 save
+
+echo ""
+echo -e "${GREEN}✓ PM2 Persistence configured successfully!${NC}"
+echo ""
+echo "What this means:"
+echo "- All PM2 processes will auto-restart after VPS reboot"
+echo "- builder-dashboard will always be available"
+echo "- All your projects will restart automatically"
+echo ""
+echo "To test: sudo reboot (VPS will restart, PM2 will restore all processes)"

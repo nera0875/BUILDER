@@ -1,0 +1,17 @@
+# .build/ is SACRED - Orchestrator ONLY
+
+# Only these files allowed:
+!context.md
+!tasks.md  
+!issues.md
+!specs.md
+!timeline.md
+!decisions/
+!templates/
+
+# Everything else is FORBIDDEN
+*.log
+*.tmp
+*-test.md
+*-INSTALL.md
+*-guide.md

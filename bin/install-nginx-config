@@ -1,0 +1,123 @@
+#!/bin/bash
+# Install pre-generated Nginx config
+# Run AFTER generate-nginx-config
+
+set -e
+
+# Show help
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  cat << 'EOF'
+Install Nginx Configuration
+
+USAGE:
+  install-nginx-config
+
+DESCRIPTION:
+  Installs pre-generated Nginx config to /etc/nginx/sites-available/builder
+  Requires sudo access.
+
+  Must run generate-nginx-config first!
+
+INTERACTIVE:
+  Shows commands before execution
+  Prompts for confirmation (y/N)
+
+STEPS:
+  1. Copy /tmp/builder-nginx.conf → /etc/nginx/sites-available/builder
+  2. Disable default site
+  3. Enable builder site
+  4. Test configuration (nginx -t)
+  5. Reload Nginx
+
+EXAMPLES:
+  # Generate + install
+  generate-nginx-config && install-nginx-config
+
+  # Install only (if already generated)
+  install-nginx-config
+
+SEE ALSO:
+  generate-nginx-config, NGINX-SETUP.md
+EOF
+  exit 0
+fi
+
+CONFIG_TEMPLATE="/tmp/builder-nginx.conf"
+NGINX_CONFIG="/etc/nginx/sites-available/builder"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+if [ ! -f "$CONFIG_TEMPLATE" ]; then
+  echo -e "${RED}ERROR: Config template not found at $CONFIG_TEMPLATE${NC}"
+  echo "Run generate-nginx-config first!"
+  exit 1
+fi
+
+echo -e "${BLUE}🔧 Installing Nginx configuration...${NC}"
+echo ""
+echo -e "${YELLOW}The following commands will be executed with sudo:${NC}"
+echo ""
+echo "  sudo cp $CONFIG_TEMPLATE $NGINX_CONFIG"
+echo "  sudo rm -f /etc/nginx/sites-enabled/default"
+echo "  sudo ln -sf $NGINX_CONFIG /etc/nginx/sites-enabled/builder"
+echo "  sudo nginx -t"
+echo "  sudo systemctl reload nginx"
+echo ""
+read -p "Continue? (y/N) " -n 1 -r
+echo
+
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "Cancelled."
+  exit 0
+fi
+
+# Execute sudo commands
+echo -e "${BLUE}📋 Copying config...${NC}"
+sudo cp "$CONFIG_TEMPLATE" "$NGINX_CONFIG"
+echo -e "${GREEN}✓${NC} Config written to $NGINX_CONFIG"
+
+echo -e "${BLUE}🔗 Enabling site...${NC}"
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf "$NGINX_CONFIG" /etc/nginx/sites-enabled/builder
+echo -e "${GREEN}✓${NC} Site enabled (default disabled)"
+
+echo -e "${BLUE}🧪 Testing configuration...${NC}"
+if sudo nginx -t 2>&1 | grep -q "successful"; then
+  echo -e "${GREEN}✓${NC} Configuration valid"
+
+  echo -e "${BLUE}🔄 Reloading Nginx...${NC}"
+  sudo systemctl reload nginx
+  echo -e "${GREEN}✓${NC} Nginx reloaded"
+
+  echo ""
+  echo -e "${GREEN}✅ Nginx configuration installed successfully!${NC}"
+  echo ""
+  echo "Dashboard: http://localhost"
+  echo "Health: http://localhost/health"
+
+  # Show project URLs
+  REGISTRY="/home/pilote/projet/primaire/BUILDER/bin/lib/port-registry.json"
+  if [ -f "$REGISTRY" ]; then
+    echo ""
+    echo "Projects:"
+    node -e "
+    const fs = require('fs');
+    const registry = JSON.parse(fs.readFileSync('$REGISTRY', 'utf8'));
+    for (const [name, port] of Object.entries(registry)) {
+      if (name !== 'builder-dashboard') {
+        console.log('  - http://localhost/projects/' + name + ' (port ' + port + ')');
+      }
+    }
+    "
+  fi
+
+else
+  echo -e "${RED}✗ Nginx configuration test failed!${NC}"
+  sudo nginx -t
+  exit 1
+fi

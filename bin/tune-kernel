@@ -1,0 +1,292 @@
+#!/bin/bash
+
+# Kernel Tuning CLI - VPS Performance Optimization
+# Automates kernel parameter configuration for Node.js + Nginx + PM2 workloads
+# Features: Apply optimization, verify, rollback with backups
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/kernel-params.sh"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+NC='\033[0m'
+
+# Show usage
+show_usage() {
+  cat <<'EOF'
+Kernel Tuning CLI - VPS Performance Optimization
+
+Usage: tune-kernel <command> [options]
+
+Commands:
+  show          Display current kernel parameters
+  apply         Apply recommended optimizations (running + permanent)
+  verify        Verify parameters are correctly applied
+  backup        Backup current sysctl configuration
+  rollback      Rollback to backup (requires backup file)
+  status        Show optimization status
+  list-backups  List all available backups
+  help          Show this help message
+
+Options:
+  --dry-run     Show what would be changed without applying
+  --backup      Create backup before applying (default: always done)
+  --no-verify   Skip verification after applying
+  --force       Skip confirmation prompts
+
+Examples:
+  tune-kernel show              # Display current kernel settings
+  tune-kernel apply             # Apply recommended optimizations
+  tune-kernel apply --dry-run   # Preview changes without applying
+  tune-kernel verify            # Check if optimizations are applied
+  tune-kernel backup            # Backup current configuration
+  tune-kernel status            # Show optimization status
+  tune-kernel list-backups      # List available backup files
+
+EOF
+}
+
+# Helper: check if sudo password is configured
+check_sudo_configured() {
+  if ! is_sudo_configured; then
+    echo -e "${RED}ERROR: Sudo password not configured${NC}"
+    echo "Please set it up first:"
+    echo "  echo 'YOUR_PASSWORD' > /home/pilote/.secrets/sudo-password"
+    echo ""
+    echo "Or configure passwordless sudo for sysctl commands (recommended for production)"
+    exit 1
+  fi
+}
+
+# Command: show current parameters
+cmd_show() {
+  echo -e "${BLUE}=== Current Kernel Parameters ===${NC}"
+  echo ""
+  show_comparison
+  echo ""
+  echo -e "${MAGENTA}Recommended parameters:${NC}"
+  echo ""
+  get_recommended_params
+}
+
+# Command: apply optimization
+cmd_apply() {
+  local dry_run="${1:-false}"
+  local skip_verify="${2:-false}"
+
+  echo -e "${BLUE}=== Applying Kernel Optimizations ===${NC}"
+  echo ""
+
+  check_sudo_configured
+
+  # Create backup
+  echo -e "${YELLOW}Step 1: Backing up current configuration...${NC}"
+  backup_current_sysctl
+  echo ""
+
+  # Show what will be applied
+  echo -e "${YELLOW}Step 2: Parameters to apply:${NC}"
+  local params=$(get_recommended_params)
+  echo "$params"
+  echo ""
+
+  # Confirmation
+  if [ "$dry_run" == "true" ]; then
+    echo -e "${YELLOW}[DRY RUN MODE] Changes NOT applied${NC}"
+    return 0
+  fi
+
+  read -p "$(echo -e ${BLUE}Continue with optimization? [y/N]:${NC} )" -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}Cancelled${NC}"
+    return 0
+  fi
+
+  # Apply to running system
+  echo -e "${YELLOW}Step 3: Applying to running system...${NC}"
+  apply_params "$params" false
+  echo ""
+
+  # Write permanent
+  echo -e "${YELLOW}Step 4: Writing permanent configuration...${NC}"
+  write_permanent_params "$params"
+  echo ""
+
+  # Verify
+  if [ "$skip_verify" != "true" ]; then
+    echo -e "${YELLOW}Step 5: Verifying parameters...${NC}"
+    if verify_params \
+      "net.core.somaxconn=65535" \
+      "net.ipv4.tcp_max_syn_backlog=65535" \
+      "net.ipv4.tcp_tw_reuse=1" \
+      "fs.file-max=2097152"; then
+      echo ""
+      echo -e "${GREEN}✓ Optimization complete and verified!${NC}"
+      echo ""
+      echo "Note: Some parameters require reboot to take full effect"
+      echo "Recommendation: Reboot at convenient time"
+    else
+      echo ""
+      echo -e "${YELLOW}⚠ Some parameters failed to verify${NC}"
+      echo "Check backup and sysctl configuration"
+    fi
+  fi
+}
+
+# Command: verify parameters
+cmd_verify() {
+  echo -e "${BLUE}=== Verifying Kernel Parameters ===${NC}"
+  echo ""
+
+  check_sudo_configured
+
+  local params=$(get_applied_params)
+
+  if [ -z "$params" ]; then
+    echo -e "${YELLOW}No optimizations currently applied${NC}"
+    echo "Run: tune-kernel apply"
+    return 1
+  fi
+
+  echo "Checking applied parameters..."
+  echo ""
+
+  verify_params \
+    "net.core.somaxconn=65535" \
+    "net.ipv4.tcp_max_syn_backlog=65535" \
+    "net.ipv4.ip_local_port_range=1024 65535" \
+    "net.ipv4.tcp_tw_reuse=1" \
+    "fs.file-max=2097152"
+}
+
+# Command: backup configuration
+cmd_backup() {
+  echo -e "${BLUE}=== Backing Up Kernel Configuration ===${NC}"
+  echo ""
+
+  check_sudo_configured
+
+  backup_current_sysctl
+  echo -e "${GREEN}✓ Backup complete${NC}"
+}
+
+# Command: show status
+cmd_status() {
+  echo -e "${BLUE}=== Kernel Tuning Status ===${NC}"
+  echo ""
+
+  local sysctl_custom="/etc/sysctl.d/99-vps-optimize.conf"
+
+  if [ -f "$sysctl_custom" ]; then
+    echo -e "${GREEN}✓ Optimizations applied${NC}"
+    echo ""
+    echo "Configuration file: $sysctl_custom"
+    echo ""
+    echo "Applied parameters:"
+    grep -v "^#" "$sysctl_custom" | grep -v "^$" || echo "  (none)"
+  else
+    echo -e "${YELLOW}⚠ No optimizations applied yet${NC}"
+    echo ""
+    echo "Run: tune-kernel apply"
+  fi
+
+  echo ""
+  echo "Backups:"
+  list_backups || echo "  (no backups found)"
+}
+
+# Command: rollback
+cmd_rollback() {
+  local backup_file="$1"
+
+  if [ -z "$backup_file" ]; then
+    echo -e "${BLUE}=== Available Backups ===${NC}"
+    echo ""
+    list_backups
+    echo ""
+    echo "Usage: tune-kernel rollback <backup-file>"
+    echo "Example: tune-kernel rollback /home/pilote/projekt/primaire/BUILDER/bin/lib/kernel-backups/sysctl-backup-20250111-120000.conf"
+    return 0
+  fi
+
+  echo -e "${BLUE}=== Rollback Kernel Configuration ===${NC}"
+  echo ""
+
+  check_sudo_configured
+
+  if [ ! -f "$backup_file" ]; then
+    echo -e "${RED}ERROR: Backup file not found: $backup_file${NC}"
+    return 1
+  fi
+
+  read -p "$(echo -e ${YELLOW}Rollback to backup? [y/N]:${NC} )" -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}Cancelled${NC}"
+    return 0
+  fi
+
+  rollback_params "$backup_file"
+}
+
+# Command: list backups
+cmd_list_backups() {
+  echo -e "${BLUE}=== Kernel Configuration Backups ===${NC}"
+  echo ""
+  list_backups
+  echo ""
+}
+
+# Main command router
+COMMAND="${1:-help}"
+shift || true
+
+case "$COMMAND" in
+  show)
+    cmd_show
+    ;;
+  apply)
+    DRY_RUN=false
+    SKIP_VERIFY=false
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --dry-run) DRY_RUN=true ;;
+        --no-verify) SKIP_VERIFY=true ;;
+        *) ;;
+      esac
+      shift
+    done
+    cmd_apply "$DRY_RUN" "$SKIP_VERIFY"
+    ;;
+  verify)
+    cmd_verify
+    ;;
+  backup)
+    cmd_backup
+    ;;
+  status)
+    cmd_status
+    ;;
+  rollback)
+    cmd_rollback "$@"
+    ;;
+  list-backups)
+    cmd_list_backups
+    ;;
+  help|--help|-h|"")
+    show_usage
+    ;;
+  *)
+    echo -e "${RED}ERROR: Unknown command '$COMMAND'${NC}"
+    echo ""
+    show_usage
+    exit 1
+    ;;
+esac

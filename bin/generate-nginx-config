@@ -1,0 +1,181 @@
+#!/bin/bash
+# Generate Nginx config from port registry
+# Usage: generate-nginx-config [--help]
+
+set -e
+
+# Show help
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+  cat << 'EOF'
+Generate Nginx Reverse Proxy Configuration
+
+USAGE:
+  generate-nginx-config
+
+DESCRIPTION:
+  Generates Nginx configuration file from port registry.
+  Maps projects to /projects/{name} paths.
+
+  Dashboard (port 9000) → /
+  Projects → /projects/{name}
+
+OUTPUT:
+  /tmp/builder-nginx.conf
+
+AUTOMATIC:
+  Called automatically by port-manager on assign/release
+
+INSTALL:
+  install-nginx-config (interactive)
+
+  OR manually:
+    sudo cp /tmp/builder-nginx.conf /etc/nginx/sites-available/builder
+    sudo ln -sf /etc/nginx/sites-available/builder /etc/nginx/sites-enabled/builder
+    sudo nginx -t && sudo systemctl reload nginx
+
+EXAMPLES:
+  # Generate config
+  generate-nginx-config
+
+  # Generate + install
+  generate-nginx-config && install-nginx-config
+
+SEE ALSO:
+  install-nginx-config, port-manager, NGINX-SETUP.md
+EOF
+  exit 0
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REGISTRY="$SCRIPT_DIR/lib/port-registry.json"
+CONFIG_TEMPLATE="/tmp/builder-nginx.conf"
+NGINX_CONFIG="/etc/nginx/sites-available/builder"
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}🔧 Generating Nginx configuration...${NC}"
+
+# Check registry exists
+if [ ! -f "$REGISTRY" ]; then
+  echo -e "${RED}ERROR: Port registry not found at $REGISTRY${NC}"
+  exit 1
+fi
+
+# Start config
+cat > "$CONFIG_TEMPLATE" << 'EOF'
+# Builder System - Nginx Reverse Proxy
+# Auto-generated - DO NOT EDIT MANUALLY
+# Regenerate with: /home/pilote/projet/primaire/BUILDER/bin/generate-nginx-config
+
+server {
+    listen 80 default_server;
+    server_name _;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    gzip_min_length 1000;
+
+    # Client settings
+    client_max_body_size 100M;
+
+    # Dashboard (root)
+    location / {
+        proxy_pass http://localhost:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400;
+    }
+EOF
+
+# Add projects from registry
+echo -e "${BLUE}📦 Adding project routes...${NC}"
+
+node -e "
+const fs = require('fs');
+const registry = JSON.parse(fs.readFileSync('$REGISTRY', 'utf8'));
+let count = 0;
+
+for (const [name, port] of Object.entries(registry)) {
+  if (name !== 'builder-dashboard') {
+    console.log('');
+    console.log('    # Project: ' + name);
+    console.log('    location /projects/' + name + ' {');
+    console.log('        rewrite ^/projects/' + name + '(/.*)\$ \$1 break;');
+    console.log('        rewrite ^/projects/' + name + '\$ / break;');
+    console.log('');
+    console.log('        proxy_pass http://localhost:' + port + ';');
+    console.log('        proxy_http_version 1.1;');
+    console.log('        proxy_set_header Upgrade \$http_upgrade;');
+    console.log('        proxy_set_header Connection \\'upgrade\\';');
+    console.log('        proxy_set_header Host \$host;');
+    console.log('        proxy_set_header X-Real-IP \$remote_addr;');
+    console.log('        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;');
+    console.log('        proxy_set_header X-Forwarded-Proto \$scheme;');
+    console.log('        proxy_cache_bypass \$http_upgrade;');
+    console.log('        proxy_read_timeout 86400;');
+    console.log('    }');
+    count++;
+  }
+}
+
+console.error('Added ' + count + ' project routes');
+" 2>&1 | { grep -v "^Added" || true; } >> "$CONFIG_TEMPLATE"
+
+PROJECT_COUNT=$(node -e "
+const fs = require('fs');
+const registry = JSON.parse(fs.readFileSync('$REGISTRY', 'utf8'));
+console.log(Object.keys(registry).filter(k => k !== 'builder-dashboard').length);
+")
+
+echo -e "${GREEN}✓${NC} Added ${PROJECT_COUNT} project route(s)"
+
+# Static files cache
+cat >> "$CONFIG_TEMPLATE" << 'EOF'
+
+    # Static files cache
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Health check endpoint
+    location /health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+echo ""
+echo -e "${GREEN}✅ Nginx configuration generated successfully!${NC}"
+echo ""
+echo "Generated file: $CONFIG_TEMPLATE"
+echo ""
+echo "To install:"
+echo "  $SCRIPT_DIR/install-nginx-config"
+echo ""
+echo "Or manually:"
+echo "  sudo cp $CONFIG_TEMPLATE /etc/nginx/sites-available/builder"
+echo "  sudo rm -f /etc/nginx/sites-enabled/default"
+echo "  sudo ln -sf /etc/nginx/sites-available/builder /etc/nginx/sites-enabled/builder"
+echo "  sudo nginx -t && sudo systemctl reload nginx"

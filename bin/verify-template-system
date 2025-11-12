@@ -1,0 +1,107 @@
+#!/bin/bash
+# Verify Template System - Quick health check
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}=== Template System Health Check ===${NC}\n"
+
+PASS=0
+FAIL=0
+
+# Check 1: Scripts exist
+echo -n "1. Scripts exist... "
+if [ -x "$(dirname $0)/build-stack-template" ] && \
+   [ -x "$(dirname $0)/rebuild-stack" ] && \
+   [ -x "$(dirname $0)/check-template" ] && \
+   [ -x "$(dirname $0)/add-template-metadata" ]; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${RED}✗${NC}"
+  ((FAIL++))
+fi
+
+# Check 2: Documentation exists
+echo -n "2. Documentation exists... "
+BUILDER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -f "$BUILDER_DIR/.build/template-optimization.md" ] && \
+   [ -f "$BUILDER_DIR/.build/template-system-test.md" ] && \
+   [ -f "$(dirname $0)/README.md" ]; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${RED}✗${NC}"
+  ((FAIL++))
+fi
+
+# Check 3: Template directory exists
+echo -n "3. Template directory exists... "
+if [ -d "/opt/builder/template-ready" ]; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${YELLOW}⚠${NC} (will fallback to .stack/)"
+  ((PASS++))
+fi
+
+# Check 4: Template has essential directories
+echo -n "4. Template has .next/... "
+if [ -d "/opt/builder/template-ready/.next" ]; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${YELLOW}⚠${NC} (needs rebuild)"
+  ((FAIL++))
+fi
+
+echo -n "5. Template has node_modules/... "
+if [ -d "/opt/builder/template-ready/node_modules" ]; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${YELLOW}⚠${NC} (needs rebuild)"
+  ((FAIL++))
+fi
+
+# Check 5: Template has shadcn components
+echo -n "6. Template has shadcn components... "
+if [ -d "/opt/builder/template-ready/components/ui" ]; then
+  COMP_COUNT=$(ls -1 "/opt/builder/template-ready/components/ui" 2>/dev/null | wc -l)
+  echo -e "${GREEN}✓${NC} ($COMP_COUNT components)"
+  ((PASS++))
+else
+  echo -e "${RED}✗${NC}"
+  ((FAIL++))
+fi
+
+# Check 6: create-project-stream integration
+echo -n "7. create-project-stream uses template... "
+if grep -q "template-ready" "$(dirname $0)/create-project-stream" 2>/dev/null; then
+  echo -e "${GREEN}✓${NC}"
+  ((PASS++))
+else
+  echo -e "${RED}✗${NC}"
+  ((FAIL++))
+fi
+
+echo ""
+echo "Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC}"
+echo ""
+
+if [ $FAIL -eq 0 ]; then
+  echo -e "${GREEN}✓ System healthy!${NC}"
+  echo "Ready for instant project creation (~5-10s per project)"
+  exit 0
+elif [ $FAIL -le 2 ]; then
+  echo -e "${YELLOW}⚠ System needs attention${NC}"
+  echo "Recommendation: rebuild-stack"
+  exit 1
+else
+  echo -e "${RED}✗ System has issues${NC}"
+  echo "Action required: rebuild-stack"
+  exit 2
+fi

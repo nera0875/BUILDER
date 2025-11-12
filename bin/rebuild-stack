@@ -1,0 +1,62 @@
+#!/bin/bash
+# Rebuild Stack Template - Wrapper for build-stack-template
+# Safe wrapper with confirmation + error handling
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILDER_DIR="$SCRIPT_DIR/.."
+BUILT_DIR="/opt/builder/template-ready"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${YELLOW}=== Rebuild Stack Template ===${NC}\n"
+
+# Check if template exists
+if [ -d "$BUILT_DIR" ]; then
+  echo -e "${BLUE}Current template:${NC}"
+  if [ -f "$BUILT_DIR/.built-at" ]; then
+    cat "$BUILT_DIR/.built-at"
+    echo ""
+  else
+    echo "Unknown build date"
+  fi
+  echo ""
+fi
+
+# Confirm rebuild
+echo -e "${YELLOW}This will rebuild the template from .stack/${NC}"
+echo -e "${YELLOW}All projects created after will use the new template${NC}\n"
+read -p "Continue? [y/N] " -n 1 -r
+echo ""
+
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "Cancelled."
+  exit 0
+fi
+
+# Run build
+echo ""
+if "$SCRIPT_DIR/build-stack-template"; then
+  echo ""
+  echo -e "${GREEN}✓ Template rebuild complete!${NC}"
+
+  # Show what changed
+  if [ -f "$BUILT_DIR/.built-at" ]; then
+    echo ""
+    echo -e "${BLUE}New template:${NC}"
+    cat "$BUILT_DIR/.built-at"
+  fi
+
+  exit 0
+else
+  echo ""
+  echo -e "${RED}✗ Template rebuild failed${NC}"
+  echo "Check errors above"
+  exit 1
+fi

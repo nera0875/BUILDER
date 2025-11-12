@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Display Plan V2 - User-friendly format (non-technical)
+# Display Plan V3 - User-friendly format with --show-only mode
 # Shows WHAT the app does, not HOW it's coded
+# Usage:
+#   display-plan "name" --feature "..." --stack "..."         (interactive)
+#   display-plan --show-only "name" --feature "..." --stack "..." (display only, no prompt)
 
 # Colors
 RED='\033[0;31m'
@@ -72,6 +75,14 @@ print_empty() {
 }
 
 # Parse arguments (JSON-like input)
+SHOW_ONLY=false
+
+# Check for --show-only flag first
+if [ "$1" == "--show-only" ]; then
+    SHOW_ONLY=true
+    shift
+fi
+
 PROJECT_NAME="$1"
 shift
 
@@ -156,18 +167,24 @@ fi
 
 print_footer
 
-# Prompt
-echo ""
-echo -e "${GREEN}✅ Ce plan te convient?${RESET}"
-echo -e "${BLUE}❓ Besoin d'ajustements?${RESET} (je peux poser d'autres questions)"
-echo ""
-read -p "$(echo -e ${BOLD}Valide pour continuer? [y/n]:${RESET} )" -n 1 -r
-echo
+# Conditional prompt (only if not --show-only)
+if [ "$SHOW_ONLY" = false ]; then
+    echo ""
+    echo -e "${GREEN}✅ Ce plan te convient?${RESET}"
+    echo -e "${BLUE}❓ Besoin d'ajustements?${RESET} (je peux poser d'autres questions)"
+    echo ""
+    read -p "$(echo -e ${BOLD}Valide pour continuer? [y/n]:${RESET} )" -n 1 -r
+    echo
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${GREEN}✅ Création lancée!${RESET}"
-    exit 0
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}✅ Création lancée!${RESET}"
+        exit 0
+    else
+        echo -e "${YELLOW}⚠️  Annulé - demande des ajustements${RESET}"
+        exit 1
+    fi
 else
-    echo -e "${YELLOW}⚠️  Annulé - demande des ajustements${RESET}"
-    exit 1
+    # Show-only mode: just display, exit 0
+    echo ""
+    exit 0
 fi
