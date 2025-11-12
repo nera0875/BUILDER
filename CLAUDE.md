@@ -156,19 +156,24 @@ User demande feature complexe OU nouveau projet:
   ❌ INTERDIT: Compter fichiers moi-même
   ❌ INTERDIT: Proposer schema database
   ❌ INTERDIT: Décider structure frontend
+  ❌ INTERDIT: Glob/Grep/Read pour scanner (EXECUTOR le fait)
+  ❌ INTERDIT: Analyser dépendances moi-même
 
   ✅ OBLIGATION: Task(executor, sonnet, "MODE: CONSULT...")
-  ✅ EXECUTOR charge 50k tokens skills → analyse
-  ✅ EXECUTOR retourne 2k tokens plan synthétisé
-  ✅ MOI: Contexte léger → Décisions précises
+  ✅ EXECUTOR = Dependency Graph Engine (scan batch rapide)
+  ✅ EXECUTOR charge 50k tokens skills → scan 10s → build graph → retourne JSON
+  ✅ MOI: Reçois JSON vagues → Parse → Execute aveuglément
 
-STRATÉGIE TOKEN:
+STRATÉGIE TOKEN + SCAN:
 - EXECUTOR context = jetable (nouvelle instance)
+- EXECUTOR scan = batch Glob + Grep (<10s pour 500 fichiers)
 - MOI context = critique (conversation longue, pas compaction)
-- Shift complexité chez EXECUTOR → Retour synthèse légère
+- MOI scan = ZÉRO (EXECUTOR fait tout)
+- Shift complexité + scan chez EXECUTOR → Retour JSON léger
 
 RAPPEL ABSOLU:
 Je n'ai AUCUN skill chargé. EXECUTOR a 11 skills.
+Je ne scanne RIEN. EXECUTOR = scan engine.
 Jamais deviner. Toujours consulter.
 ```
 
@@ -177,6 +182,12 @@ Jamais deviner. Toujours consulter.
 - Feature complexe (database + frontend + integration)
 - Décision architecture majeure
 - Nouvelle stack/librairie
+
+**Ce que EXECUTOR retourne (JSON ready-to-execute):**
+- Scan results (structure détectée, conventions, patterns)
+- Dependency graph (qui dépend de quoi)
+- Vagues optimales (JSON avec paths absolus, actions, temps)
+- Performance metrics (X agents, Y vagues, Zmin)
 
 ---
 
@@ -425,33 +436,127 @@ User Answers:
 - Auth: [oui/non]
 - Database: [PostgreSQL/JSON/Supabase]
 
-Context: Nouveau projet (pas de .build/)
+Context: [SI nouveau: "Nouveau projet" | SI existant: coller .build/context.md]
 
-INSTRUCTIONS EXECUTOR:
-1. Charge skills appropriés automatiquement (database, frontend, integration, etc.)
-2. Analyse demande avec expertise skills
-3. NE CRÉE AUCUN FICHIER (consultation uniquement)
-4. Retourne plan structuré markdown
+SCAN RAPIDE OBLIGATOIRE (BATCH - 5-7 secondes max):
+
+⚠️ INTERDICTION ABSOLUE:
+❌ JAMAIS Read fichier par fichier (1h scan = ÉCHEC)
+❌ JAMAIS boucle séquentielle sur fichiers
+❌ JAMAIS AST parser lent
+
+✅ STRATÉGIE BATCH UNIQUEMENT:
+
+1. **Glob scan structure (1-2s):**
+   Glob("**/*.{ts,tsx,js,jsx,prisma}", path: "/frontend")
+   → Output: Liste tous paths
+
+2. **Grep all imports (3-5s):**
+   Grep("^import .* from ['\\\"]", {
+     output_mode: "content",
+     glob: "**/*.{ts,tsx}",
+     path: "/frontend"
+   })
+   → Output: Tous imports tous fichiers d'un coup
+
+3. **Parse in-memory (instantané):**
+   Analyse output Grep → Build dependency graph
+
+4. **Read .build/context.md UNIQUEMENT (si existe):**
+   1 seul Read (état actuel projet)
+
+TOTAL SCAN: <10 secondes pour 500+ fichiers
+
+DEPENDENCY GRAPH ENGINE:
+
+1. Liste TOUS fichiers à créer pour feature
+2. Pour chaque fichier: extrait imports depuis patterns skills
+3. Build graph: file → [dependencies]
+4. Topological sort → calcul niveaux (L0, L1, L2...)
+5. Vagues = niveaux (L0 = Vague 1, etc.)
 
 FORMAT RETOUR OBLIGATOIRE:
 
-## Analyse Demande
-[Résumé compréhension + features détectées]
+## Scan Projet (batch executé)
+- Structure détectée: [Next.js App Router/React/etc.]
+- Conventions paths:
+  * Types: [pattern détecté, ex: /lib/types/*.ts]
+  * Actions: [pattern, ex: /app/actions/*.ts]
+  * Components: [pattern, ex: /components/features/*]
+- Fichiers scannés: X fichiers (Yms)
+- Patterns imports: [@/lib/types, @/components/ui, etc.]
 
-## Conventions Skills Applicables
+## Fichiers à Créer: Y fichiers
 
-### Database (skill database chargé)
-- Schema Prisma: [recommandations relations/models]
-- Migrations: [stratégie]
+## Dependency Graph (calculated)
+\`\`\`
+[Graph ASCII ou description niveaux:
+L0: schema.prisma, schemas/validation.ts (aucune dépendance)
+L1: types/kanban.ts (dépend: L0 Prisma generate)
+L2: kanban-card.tsx, store.ts (dépend: L1 types)
+L3: actions/kanban.ts (dépend: L1 types + L0 schemas)
+L4: kanban-board.tsx (dépend: L2 + L3)
+L5: page.tsx (dépend: L4)
+]
+\`\`\`
 
-### Frontend (skill frontend chargé)
-- Structure app/: [organisation recommandée]
-- Composants: [patterns shadcn/ui]
-- Conventions: [naming, structure]
+## Vagues Optimales: Z vagues
 
-### Integration (skill integration chargé)
-- Server Actions: [patterns recommandés]
-- Type-safety: [Prisma → frontend flow]
+**VAGUE 1 (N agents parallèles - Level 0):**
+\`\`\`json
+[
+  {
+    "file": "/path/absolu/schema.prisma",
+    "action": "MODIFY",
+    "description": "Add KanbanTask model",
+    "depends_on": [],
+    "post_command": "npx prisma generate",
+    "estimated_time": "2min",
+    "conventions": {
+      "imports_patterns": [],
+      "type": "database"
+    }
+  },
+  {
+    "file": "/path/absolu/schemas/kanban.ts",
+    "action": "CREATE",
+    "description": "Zod validation schemas",
+    "depends_on": [],
+    "estimated_time": "1min",
+    "conventions": {
+      "imports_patterns": ["z from 'zod'"],
+      "type": "validation"
+    }
+  }
+]
+\`\`\`
+
+**VAGUE 2 (N agents - Level 1, attend Vague 1):**
+\`\`\`json
+[
+  {
+    "file": "/path/absolu/types/kanban.ts",
+    "action": "CREATE",
+    "description": "TypeScript types from Prisma",
+    "depends_on": ["schema.prisma"],
+    "estimated_time": "1min",
+    "conventions": {
+      "imports_patterns": ["@/lib/prisma", "Prisma types"],
+      "type": "types"
+    }
+  }
+]
+\`\`\`
+
+... (toutes vagues avec JSON détaillé)
+
+## Performance
+- Total agents: X
+- Vagues: Y
+- Temps séquentiel: ~Zmin
+- Temps parallélisé: ~Wmin (gain: Xx)
+- Conflits possibles: 0 (graph validé)
+- Scan time: <10s (batch Glob + Grep)
 
 ## Plan Fichiers Complet
 - Total fichiers: X
