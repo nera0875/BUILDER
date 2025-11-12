@@ -90,7 +90,41 @@
 
 **AVANT CHAQUE ACTION - CHECKS OBLIGATOIRES:**
 
-### CHECK 0: Am I Coding? (PREMIER CHECK ABSOLU)
+### CHECK -1: Ai-je Consulté EXECUTOR? (TOKEN SHIFT STRATEGY)
+
+**AVANT décider architecture/plan/schema:**
+
+```
+User demande feature complexe OU nouveau projet:
+  ❌ STOP - Je ne connais PAS les conventions
+  ❌ INTERDIT: Compter fichiers moi-même
+  ❌ INTERDIT: Proposer schema database
+  ❌ INTERDIT: Décider structure frontend
+
+  ✅ OBLIGATION: Task(executor, sonnet, "MODE: CONSULT...")
+  ✅ EXECUTOR charge 50k tokens skills → analyse
+  ✅ EXECUTOR retourne 2k tokens plan synthétisé
+  ✅ MOI: Contexte léger → Décisions précises
+
+STRATÉGIE TOKEN:
+- EXECUTOR context = jetable (nouvelle instance)
+- MOI context = critique (conversation longue, pas compaction)
+- Shift complexité chez EXECUTOR → Retour synthèse légère
+
+RAPPEL ABSOLU:
+Je n'ai AUCUN skill chargé. EXECUTOR a 11 skills.
+Jamais deviner. Toujours consulter.
+```
+
+**Triggers consultation obligatoire:**
+- Nouveau projet (>= 3 fichiers)
+- Feature complexe (database + frontend + integration)
+- Décision architecture majeure
+- Nouvelle stack/librairie
+
+---
+
+### CHECK 0: Am I Coding? (DEUXIÈME CHECK ABSOLU)
 
 **AVANT toute action, je me demande:**
 "Vais-je utiliser Edit ou Write?"
@@ -304,7 +338,7 @@ STEP 4: Done
 
 ## Nouveau Projet - Workflow
 
-### Questions (AskUserQuestion tool)
+### STEP 0: Questions (AskUserQuestion tool)
 
 ```typescript
 AskUserQuestion({
@@ -318,9 +352,77 @@ AskUserQuestion({
 
 **Questions:** Features fonctionnelles, Auth (oui/non), Database (PostgreSQL/JSON/Supabase)
 
-### Affichage Plan (display-plan) + Validation
+---
 
-**IMPORTANT:** Penser FEATURES utilisateur, pas routes techniques!
+### STEP 1: CONSULTATION EXECUTOR (OBLIGATOIRE - Boomerang)
+
+**Invoke EXECUTOR en MODE: CONSULT:**
+
+```javascript
+Task(executor, sonnet, `
+MODE: CONSULT
+
+User Request: [Copie EXACTE demande user complète]
+
+User Answers:
+- Features: [liste user responses]
+- Auth: [oui/non]
+- Database: [PostgreSQL/JSON/Supabase]
+
+Context: Nouveau projet (pas de .build/)
+
+INSTRUCTIONS EXECUTOR:
+1. Charge skills appropriés automatiquement (database, frontend, integration, etc.)
+2. Analyse demande avec expertise skills
+3. NE CRÉE AUCUN FICHIER (consultation uniquement)
+4. Retourne plan structuré markdown
+
+FORMAT RETOUR OBLIGATOIRE:
+
+## Analyse Demande
+[Résumé compréhension + features détectées]
+
+## Conventions Skills Applicables
+
+### Database (skill database chargé)
+- Schema Prisma: [recommandations relations/models]
+- Migrations: [stratégie]
+
+### Frontend (skill frontend chargé)
+- Structure app/: [organisation recommandée]
+- Composants: [patterns shadcn/ui]
+- Conventions: [naming, structure]
+
+### Integration (skill integration chargé)
+- Server Actions: [patterns recommandés]
+- Type-safety: [Prisma → frontend flow]
+
+## Plan Fichiers Complet
+- Total fichiers: X
+- Vagues parallèles: Y vagues (si >= 5 fichiers)
+- Liste détaillée:
+  * Vague 1 (indépendants): [fichiers]
+  * Vague 2 (dépendances): [fichiers]
+  * Vague 3: [fichiers]
+
+## Décisions Architecture
+[Trade-offs + alternatives considérées]
+
+## Estimations
+- Complexité: Simple/Moyenne/Complexe
+- Temps: ~X minutes
+`)
+```
+
+**EXECUTOR retourne:** Plan synthétisé 2-3k tokens (pas 50k skills)
+
+**MOI:** Reçois plan → Contexte léger → Pas de compaction risque
+
+---
+
+### STEP 2: Affichage Plan User (display-plan) + Validation
+
+**IMPORTANT:** Penser FEATURES utilisateur (basé sur plan EXECUTOR)
 
 ```bash
 display-plan "project-name" \
@@ -332,21 +434,59 @@ display-plan "project-name" \
   --stack "Next.js + PostgreSQL + shadcn/ui"
 ```
 
-**User tape `y` → Continue | User tape `n` → Re-questions**
+**User tape `y` → Continue STEP 3 | User tape `n` → Re-questions**
 
-### Création (EXECUTOR)
+---
 
-**Workflow automatique:**
-1. mkdir projet/secondaire/[nom]
-2. Invoque EXECUTOR: "Clone .stack/ + features"
-3. EXECUTOR charge skills auto (ordre strict ci-dessous)
-4. EXECUTOR exécute création complète
-5. MOI update .build/
-6. Tests + Deploy auto
+### STEP 3: Création (EXECUTOR MODE: EXECUTE)
+
+**Invocation EXECUTOR avec plan validé:**
+
+```javascript
+// SI >= 5 fichiers: Décomposer en vagues parallèles (basé plan CONSULT)
+
+// Vague 1: npm install background + fichiers indépendants
+Bash("cd /path && npm install", {run_in_background: true})
+Task(executor, haiku, "MODE: EXECUTE\nPath: /path/schema.prisma\n[plan CONSULT vague 1 file 1]")
+Task(executor, haiku, "MODE: EXECUTE\nPath: /path/types.ts\n[plan CONSULT vague 1 file 2]")
+... (parallèle)
+
+// Vague 2: Après vague 1 complète
+Task(executor, haiku, "MODE: EXECUTE\nPath: /path/component.tsx\n[plan CONSULT vague 2]")
+... (parallèle)
+
+// Vague 3: Page finale
+Task(executor, haiku, "MODE: EXECUTE\nPath: /path/page.tsx\n[plan CONSULT vague 3]")
+```
+
+**Template MODE: EXECUTE (basé sur conventions retournées CONSULT):**
+```
+MODE: EXECUTE
+
+Path: [absolu depuis plan CONSULT]
+
+Action: [Action précise depuis plan CONSULT]
+
+Stack: [depuis plan CONSULT]
+
+Conventions à respecter:
+[Copier conventions database/frontend/integration du plan CONSULT]
+
+SKIP anti-duplication scan (orchestrator confirmed via CONSULT)
+OVERWRITE existing file OK / New file, no conflicts
+
+Return: ✓ [filename]
+```
+
+**Post-création:**
+1. MOI update .build/ (context.md, specs.md, timeline.md)
+2. Tests auto (si demandé)
+3. Deploy auto (PM2 + preview URL)
 
 **RÈGLES:**
 - ❌ JAMAIS npx create-next-app (utiliser .stack/)
 - ❌ JAMAIS Skill() dans orchestrator (EXECUTOR le fait)
+- ✅ TOUJOURS baser EXECUTE sur plan CONSULT
 - ✅ .build/ créé 1x par projet, updated chaque feature
 
 ---
@@ -359,18 +499,66 @@ display-plan "project-name" \
 1. Read .build/context.md (stack, routes, composants)
 2. Read .build/tasks.md (éviter duplication)
 3. Read .build/issues.md (solutions existantes)
-4. Glob scan: components/**/*.tsx, app/**/*.tsx si besoin
+4. Glob scan: components/**/*.tsx, app/**/*.tsx si besoin (SI nécessaire)
 ```
 
 **Token cost:** ~1000 tokens max
 
-### Détection & Routing
+---
 
-**Feature SIMPLE (<3 fichiers):**
-→ EXECUTOR direct → Validation → Execute
+### Phase 1: CONSULTATION EXECUTOR (SI complexe)
 
-**Feature COMPLEXE (>=3 fichiers):**
-→ Analyse scope → TodoWrite → EXECUTOR phases → Tests → Deploy
+**Triggers:**
+- Feature >= 3 fichiers
+- Database schema changes
+- Nouvelle intégration (API, lib)
+
+**Invoke MODE: CONSULT:**
+
+```javascript
+Task(executor, sonnet, `
+MODE: CONSULT
+
+User Request: [demande user]
+
+Context Projet:
+[Coller .build/context.md pertinent]
+
+INSTRUCTIONS EXECUTOR:
+1. Charge skills (database/frontend/integration selon besoin)
+2. Analyse demande dans contexte projet existant
+3. Propose plan avec conventions projet
+4. NE CRÉE AUCUN FICHIER
+
+FORMAT RETOUR:
+
+## Analyse
+[Compréhension + impact sur existant]
+
+## Conventions Applicables
+[Skills pertinents + patterns projet]
+
+## Plan Fichiers
+- Nouveaux: [liste]
+- Modifiés: [liste]
+- Vagues: [si >= 5 fichiers]
+
+## Intégration
+[Comment s'intègre dans existant]
+`)
+```
+
+**EXECUTOR retourne:** Plan léger → MOI décide exécution
+
+---
+
+### Phase 2: Détection & Routing
+
+**Feature SIMPLE (<3 fichiers) SANS consultation:**
+→ EXECUTOR direct MODE: EXECUTE → Validation → Execute
+
+**Feature COMPLEXE (>=3 fichiers) AVEC consultation:**
+→ CONSULT (Phase 1) → Validation user → EXECUTE vagues → Tests → Deploy
 
 **Bug:**
 → Check issues.md → Si solution: Apply → Sinon: EXECUTOR diagnose + fix
