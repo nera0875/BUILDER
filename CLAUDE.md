@@ -98,17 +98,7 @@ Pas juste "fix bug" → UPDATE SYSTÈME pour prévenir
 - Anti-duplication checker
 
 **SKILLS AUTO-CHARGÉS (ordre strict):**
-1. **rules** (TOUJOURS premier - anti-pollution)
-2. **frontend** (SI Next.js/React)
-3. **backend** (SI Python FastAPI OU Node.js)
-4. **backend-nodejs** (SI Node.js spécifique)
-5. **database** (SI Prisma/PostgreSQL)
-6. **integration** (SI full-stack)
-7. **research** (SI nouvelle lib OU docs needed)
-8. **project-creator** (Auto-trigger via Dashboard API)
-9. **testing** (APRÈS features créées)
-10. **deployment** (APRÈS tests passed)
-11. **git** (SI commit/push demandé)
+1. rules (anti-pollution) → 2. frontend (Next.js/React) → 3. backend (FastAPI/Node.js) → 4. backend-nodejs (Node.js specific) → 5. database (Prisma/PostgreSQL) → 6. integration (full-stack) → 7. research (nouvelle lib) → 8. project-creator (Dashboard API) → 9. testing (après features) → 10. deployment (après tests) → 11. git (commit/push)
 
 **Principe:** EXECUTOR détecte stack et charge skills appropriés automatiquement.
 
@@ -153,95 +143,30 @@ Sans update .build/, prochaine fois je serai aveugle.
 inventory.md = SOURCE DE VÉRITÉ pour anti-duplication.
 ```
 
-**Exemples VIOLATION:**
-```
-❌ User: "Ajoute recherche articles"
-   MOI: Task(executor, "Crée search-bar.tsx...")
-   → VIOLATION! Pas lu .build/ → Je ne connais pas stack/structure
-
-❌ EXECUTOR complète feature
-   MOI: "✓ Feature done"
-   → VIOLATION! Pas updated .build/ → Prochaine fois je serai perdu
-```
-
-**Exemples CORRECT:**
+**Exemple:**
 ```
 ✅ User: "Ajoute recherche articles"
-   MOI:
    1. Read .build/context.md → Stack: Next.js, Model Post existe
-   2. Read .build/tasks.md → Pas de duplication
-   3. Décide plan → Invoke EXECUTOR
-   4. EXECUTOR complète
-   5. Update .build/context.md (search-bar.tsx ajouté)
-   6. Update .build/tasks.md (recherche → completed)
-   7. Append .build/timeline.md (log feature)
+   2. Read .build/inventory.md → Pas de SearchBar existant
+   3. Invoke EXECUTOR → Création search-bar.tsx
+   4. Update .build/ (context + inventory + timeline)
 ```
 
 ---
 
 ### CHECK -1.5: Source Code Scan (SI source externe mentionnée)
 
-**TRIGGERS (détection automatique):**
-- User dit "intègre depuis X"
-- User mentionne GitHub URL
-- User mentionne path local externe (/tmp/, autre projet)
-- User dit "j'ai copié", "clone", "utilise ce code"
+**TRIGGERS:** User dit "intègre depuis X" | GitHub URL | path externe | "clone" | "utilise ce code"
 
-**WORKFLOW RAPIDE (<10s):**
+**WORKFLOW (<10s):**
+1. Extract source (GitHub → clone /tmp/ | Path local → Glob verify)
+2. Quick scan (Glob batch components/lib/keywords) → Liste fichiers pertinents
+3. Read top 3-5 files → Analyse réutilisabilité
+4. Décision: COPY+ADAPT (compatible) | ADAPT PARTS (partiel) | CREATE (incompatible)
+5. Document décision → Pass à EXECUTOR MODE: CONSULT avec strategy
 
-```
-1. **Parse user request → Extract source location:**
-   - GitHub URL → Bash clone dans /tmp/[repo-name]
-   - Path local → Vérifier existe avec Glob
-
-2. **Quick scan structure (batch 3-5s):**
-   Glob: [source]/components/**/*.tsx
-   Glob: [source]/lib/**/*.ts
-   Glob: [source]/**/*[keywords]*.{ts,tsx}
-   → Résultat: Liste fichiers pertinents
-
-3. **Read top files (3-5 max, 2-3s):**
-   Read: Top 3 fichiers les plus pertinents
-   → Analyse: Taille, dépendances, réutilisabilité
-
-4. **Décision stratégique:**
-   SI module complet + compatible stack:
-     ✅ COPY + ADAPT strategy
-     ✅ Gain: 30-50% temps, code production-ready
-
-   SI code partiel ou ancien:
-     ⚠️ ADAPT PARTS strategy
-     ⚠️ Réutiliser patterns, recréer reste
-
-   SI incompatible stack:
-     ❌ CREATE from scratch
-     ❌ Trop de refactoring nécessaire
-
-5. **Documentation décision:**
-   ## Source Code Analysis
-   - Location: /tmp/shadcn-kit-temp
-   - Modules trouvés: kanban.tsx (1036L), todo-list.tsx (320L)
-   - Strategy: COPY + ADAPT
-   - Reason: Production-ready avec @dnd-kit intégré
-   - Gain estimé: 40% temps vs create from scratch
-
-6. **Pass à EXECUTOR MODE: CONSULT:**
-   Instruction inclut:
-   "Source analysis completed.
-   Strategy: COPY + ADAPT
-   Source: /tmp/shadcn-kit-temp
-   Files: kanban.tsx, todo-list.tsx, tasks.tsx
-   Target: Adapter pour PostgreSQL backend"
-```
-
-**RÉSULTAT:**
-- EXECUTOR reçoit contexte complet (source + stratégie)
-- Plan optimal avec réutilisation maximale
-- Pas de duplication code existant externe
-
-**SKIP SI:**
-- Pas de source externe mentionnée
-- Feature interne projet seulement
+**RÉSULTAT:** EXECUTOR reçoit contexte source + stratégie optimale
+**SKIP SI:** Pas de source externe mentionnée
 
 ---
 
@@ -334,82 +259,21 @@ EXECUTOR a les skills. Pas moi.
 User demande feature/projet → Je COMPTE fichiers nécessaires
 
 SI >= 5 fichiers:
-  ❌ STOP IMMÉDIATEMENT
-  ❌ NE PAS invoquer 1 seul EXECUTOR avec tout
-  ✅ OBLIGATOIRE: Décomposer en vagues parallèles
+  ❌ STOP IMMÉDIATEMENT - Décomposer en vagues parallèles
   ✅ Afficher plan vagues au user AVANT exécution
 
 SI < 5 fichiers:
   ✅ OK: 1 EXECUTOR ou 2-3 en parallèle
 ```
 
-**Exemple INTERDIT:**
-```javascript
-// ❌ JAMAIS FAIRE ÇA (10 fichiers = 1 agent)
-Task(executor, "Crée projet Pomodoro complet avec:
-- schema.prisma
-- 8 composants
-- 3 actions
-- hooks
-etc...")
-→ VIOLATION! >= 5 fichiers détectés!
-```
-
-**Exemple CORRECT:**
-```javascript
-// ✅ OBLIGATOIRE (10 fichiers = 3 vagues)
-// Vague 1: 5 agents parallèles (fichiers indépendants)
-Task(executor, "Crée schema.prisma ONLY")
-Task(executor, "Crée types.ts ONLY")
-Task(executor, "Crée audio.ts ONLY")
-... x5
-
-// Vague 2: 3 agents parallèles (dépendent vague 1)
-Task(executor, "Crée timer.tsx ONLY")
-... x3
-
-// Vague 3: 1 agent (page finale)
-Task(executor, "Crée page.tsx ONLY")
-```
+**Exemple:** 10 fichiers = 3 vagues (Vague 1: 5 agents indépendants | Vague 2: 3 agents dépendants | Vague 3: 1 page finale)
 
 ---
 
 ### CHECK 2: Prompt Agent (STOP si manque keywords)
 
-```
-AVANT invoquer Task(executor, prompt):
-
-✅ VÉRIFIER prompt contient TOUS ces keywords:
-  1. "Path: [ABSOLU]"
-  2. "SKIP anti-duplication scan"
-  3. "OVERWRITE existing file OK" OU "New file, no conflicts"
-  4. "Return: ✓ [filename]"
-
-❌ SI 1 keyword manquant:
-  → STOP
-  → Reformuler prompt avec keywords
-  → Puis invoquer
-```
-
-**Exemple INTERDIT:**
-```javascript
-// ❌ Prompt vague (manque keywords)
-Task(executor, "Crée README.md pour le blog")
-→ VIOLATION! Manque: Path absolu, SKIP, OVERWRITE, Return format
-```
-
-**Exemple CORRECT:**
-```javascript
-// ✅ Prompt avec TOUS keywords
-Task(executor, `Path: /home/pilote/projet/secondaire/blog/README.md
-
-OVERWRITE README.md existant avec content:
-[content exact]
-
-SKIP anti-duplication scan (orchestrator confirmed)
-
-Return: ✓ README.md`)
-```
+**VÉRIFIER prompt contient 4 keywords:** Path: [ABSOLU] | SKIP anti-duplication scan | OVERWRITE/New file | Return: ✓ [filename]
+**SI manquant:** STOP → Reformuler → Invoquer
 
 ---
 
@@ -466,32 +330,6 @@ SI total > 5:
 
 ---
 
-## WORKFLOW FORCÉ (Pas de déviation possible)
-
-**Nouveau Projet (>= 5 fichiers):**
-
-```
-STEP 1: Count fichiers
-STEP 2: SI >= 5 → STOP → Plan vagues
-STEP 3: Affiche plan user (nombre vagues, fichiers par vague)
-STEP 4: User valide
-STEP 5: Vague 1 (npm background + fichiers simples)
-STEP 6: Check npm done
-STEP 7: Vague 2 (composants avec imports)
-STEP 8: Vague 3 (page finale)
-STEP 9: Tests + Deploy
-```
-
-**Feature Simple (< 5 fichiers):**
-
-```
-STEP 1: Count fichiers
-STEP 2: SI < 5 → OK direct
-STEP 3: 1-3 agents avec prompts STRICT (keywords obligatoires)
-STEP 4: Done
-```
-
----
 
 ## Workflow Auto (STRICT)
 
@@ -608,53 +446,20 @@ Module: pages
 
 ## Vagues Optimales (topological sort modules)
 
-**VAGUE 1 (N agents parallèles - Level 0):**
+**VAGUE N (format JSON):**
 \`\`\`json
-[
-  {
-    "file": "/path/absolu/schema.prisma",
-    "action": "MODIFY",
-    "description": "Add KanbanTask model",
-    "depends_on": [],
-    "post_command": "npx prisma generate",
-    "estimated_time": "2min",
-    "conventions": {
-      "imports_patterns": [],
-      "type": "database"
-    }
-  },
-  {
-    "file": "/path/absolu/schemas/kanban.ts",
-    "action": "CREATE",
-    "description": "Zod validation schemas",
-    "depends_on": [],
-    "estimated_time": "1min",
-    "conventions": {
-      "imports_patterns": ["z from 'zod'"],
-      "type": "validation"
-    }
-  }
-]
+[{
+  "file": "/path/absolu/file.ext",
+  "action": "CREATE|MODIFY",
+  "description": "Description action",
+  "depends_on": ["file1.ext", ...],
+  "post_command": "optional command",
+  "estimated_time": "Xmin",
+  "conventions": {"imports_patterns": [...], "type": "module_type"}
+}]
 \`\`\`
 
-**VAGUE 2 (N agents - Level 1, attend Vague 1):**
-\`\`\`json
-[
-  {
-    "file": "/path/absolu/types/kanban.ts",
-    "action": "CREATE",
-    "description": "TypeScript types from Prisma",
-    "depends_on": ["schema.prisma"],
-    "estimated_time": "1min",
-    "conventions": {
-      "imports_patterns": ["@/lib/prisma", "Prisma types"],
-      "type": "types"
-    }
-  }
-]
-\`\`\`
-
-... (toutes vagues avec JSON détaillé)
+... (repeat pattern pour toutes vagues)
 
 ## Performance
 - Total agents: X
@@ -838,25 +643,8 @@ FORMAT RETOUR:
 ## Agent & Skills
 
 **EXECUTOR = Agent unique**
-
-**Ordre chargement skills (STRICT):**
-1. **rules** - TOUJOURS premier (règles anti-pollution fichiers)
-2. **frontend** - SI Next.js/React (clone .stack/, conventions)
-3. **backend** - SI Python FastAPI OU Node.js/TypeScript
-4. **database** - SI Prisma/PostgreSQL demandé
-5. **integration** - SI full-stack (backend + frontend)
-6. **research** - SI nouvelle lib mentionnée OU comparaison tech
-7. **testing** - APRÈS features créées (E2E Chrome DevTools)
-8. **deployment** - APRÈS tests passed (PM2 + preview URL)
-9. **git** - SI commit/push demandé
-
-**RÈGLE:** Orchestrator JAMAIS Skill() direct (EXECUTOR détecte + charge auto)
-
-**Détection auto stack:**
-- Scan package.json → Node.js/TypeScript
-- Scan *.py → Python
-- User demande "PostgreSQL" → Database skill
-- Feature full-stack → Integration skill
+**Skills:** Voir section "ORCHESTRATOR vs EXECUTOR" pour ordre chargement (11 skills auto-détectés)
+**Détection auto:** package.json → Node.js | *.py → Python | "PostgreSQL" → Database skill | full-stack → Integration
 
 ---
 
@@ -888,13 +676,12 @@ Return: ✓ [project-name] créé avec [X] fichiers
 ```
 
 **Keywords magiques (TOUJOURS inclure):**
-- `SKIP anti-duplication scan` → EXECUTOR skip 30+ tool uses
-- `orchestrator confirmed` → EXECUTOR trust mes infos
-- `Return: ✓ [summary]` → Format bref attendu
+1. `Path: [ABSOLU]`
+2. `SKIP anti-duplication scan (orchestrator confirmed)`
+3. `OVERWRITE existing file OK` / `New file, no conflicts`
+4. `Return: ✓ [filename]`
 
-**Model choice:**
-- `haiku` - Features simples (<5 fichiers)
-- `sonnet` - Features complexes (>=5 fichiers) OU nouvelle stack
+**Model choice:** haiku (<5 fichiers simples) | sonnet (>=5 fichiers OU nouvelle stack)
 
 ---
 
@@ -947,42 +734,14 @@ Vague 3: [page.tsx] (dépend vague 2)
 **Vague N: 1 message = MULTIPLE Task() calls**
 
 ```typescript
-// 1 SEUL message avec 6 tool calls simultanés (Vague 1)
-
-Task(executor, haiku, "Crée lib/types.ts
-Path: /home/pilote/projet/secondaire/todo-app/lib/types.ts
-Content:
-export type Todo = {
-  id: string
-  title: string
-  completed: boolean
-  createdAt: Date
-}
-SKIP anti-duplication scan
-Return: ✓ types.ts créé")
-
-Task(executor, haiku, "Crée components/todo-item.tsx
-Path: /home/pilote/projet/secondaire/todo-app/components/todo-item.tsx
-Import: Checkbox, Card from @/components/ui (shadcn présent)
-Import: Todo from @/lib/types
-Props: {todo: Todo, onToggle: (id: string) => void, onDelete: (id: string) => void}
-Style: Tailwind utilities
-Directive: 'use client' (onClick handlers)
-SKIP anti-duplication scan
-Return: ✓ todo-item.tsx créé")
-
-Task(executor, haiku, "Crée components/add-todo.tsx...")
-Task(executor, haiku, "Crée lib/actions/todos.ts...")
-Task(executor, haiku, "Crée app/layout.tsx...")
-Task(executor, haiku, "Crée prisma/schema.prisma...")
+// Exemple: 1 message avec 6 tool calls simultanés (Vague 1)
+Task(executor, haiku, "Path: /path/types.ts\nContent: [exact]\nSKIP anti-duplication\nReturn: ✓ types.ts")
+Task(executor, haiku, "Path: /path/todo-item.tsx\nImport: Todo from @/lib/types\nProps: {...}\nSKIP anti-duplication\nReturn: ✓ todo-item.tsx")
+... x4 autres Task() parallèles
 ```
 
-**Attendre que les 6 EXECUTOR retournent → Vague 2**
-
-**Contraintes:**
-- Max **10-15 Task() par message** (limite Claude Code platform)
-- Instructions ULTRA précises (path complet, imports exacts, props détaillés)
-- Haiku model pour rapidité (sauf si complexe → sonnet)
+**Attendre 6 EXECUTOR → Vague 2**
+**Contraintes:** Max 10-15 Task()/message | Instructions précises (path/imports/props) | Haiku (rapide) vs Sonnet (complexe)
 
 ### Phase 3: Validation Finale
 
@@ -1014,126 +773,20 @@ Bash("prisma migrate dev", run_in_background: true)
 
 ### Prompts Ultra-Précis Agents
 
-**Template obligatoire pour CHAQUE agent:**
-```
-Path: [CHEMIN ABSOLU COMPLET]
-
-[ACTION PRÉCISE]:
-- [Détail 1 avec valeurs exactes]
-- [Détail 2 avec imports confirmés]
-- [Détail 3 avec props/types]
-
-SKIP anti-duplication scan (orchestrator confirmed)
-[SI fichier existe: "OVERWRITE existing file OK"]
-[SI nouveau: "New file, no conflicts"]
-
-Return: ✓ [filename]
-```
-
-**Keywords magiques (TOUJOURS inclure):**
-1. ✅ `SKIP anti-duplication scan` (agent skip 30+ tools)
-2. ✅ `orchestrator confirmed` (agent trust mes infos)
-3. ✅ `OVERWRITE existing file OK` / `New file, no conflicts`
-4. ✅ `Return: ✓ [filename]` (format bref return)
-
-**Gain:** 10x plus rapide par fichier (5-10s vs 1m+)
+**Template:** Voir section "Invocation EXECUTOR" pour keywords magiques (4 keywords obligatoires)
+**Gain:** 10x plus rapide par fichier (5-10s vs 1m+) grâce à SKIP anti-dup scan
 
 ---
 
 ## Sudo Access System
 
-### Password Storage (Automated)
+**Helper:** `/home/pilote/projet/primaire/BUILDER/bin/lib/sudo-helper.sh`
+**Password:** `/home/pilote/.secrets/sudo-password` (600 perms)
+**Functions:** `is_sudo_configured()`, `sudo_exec <command>`
 
-**Location:** `/home/pilote/.secrets/sudo-password`
-- Permissions: 600 (owner read/write only)
-- Contains: Plain text sudo password
-- Used by: Orchestrator ET agents (EXECUTOR, deployment, etc.)
-
-**Helper script:** `/home/pilote/projet/primaire/BUILDER/bin/lib/sudo-helper.sh`
-
-### Usage in Scripts
-
-**Pour ORCHESTRATOR et AGENTS:**
-
-```bash
-# Source le helper
-source /home/pilote/projet/primaire/BUILDER/bin/lib/sudo-helper.sh
-
-# Check si configuré
-if is_sudo_configured; then
-  # Execute commande avec sudo
-  sudo_exec apt-get install -y package-name
-  sudo_exec systemctl restart service-name
-else
-  echo "ERROR: Sudo not configured. Run: /home/pilote/projet/primaire/BUILDER/bin/setup-sudo"
-  exit 1
-fi
-```
-
-**Fonctions disponibles:**
-- `is_sudo_configured()` → Check si password existe
-- `sudo_exec <command>` → Execute avec sudo automatiquement
-- `get_sudo_password()` → Retourne password (rare usage direct)
-
-### Pour EXECUTOR Agent
-
-**Quand créer scripts bash qui nécessitent sudo:**
-
-```bash
-#!/bin/bash
-# Mon script qui installe packages système
-
-# TOUJOURS sourcer le helper
-BUILDER_DIR="/home/pilote/projet/primaire/BUILDER"
-source "$BUILDER_DIR/bin/lib/sudo-helper.sh"
-
-# Check sudo disponible
-if ! is_sudo_configured; then
-  echo "ERROR: Sudo password not configured"
-  echo "Admin must run: $BUILDER_DIR/bin/setup-sudo"
-  exit 1
-fi
-
-# Execute commandes système
-sudo_exec apt-get update
-sudo_exec apt-get install -y postgresql
-sudo_exec systemctl enable postgresql
-```
-
-### Setup Initial (Une seule fois)
-
-**Admin doit exécuter:**
-```bash
-cd /home/pilote/projet/primaire/BUILDER
-./bin/setup-sudo
-# Entre password: Voiture789
-```
-
-**Après ça, TOUS les scripts/agents peuvent utiliser sudo automatiquement.**
-
-### Sécurité
-
-- ✅ File permissions 600 (lecture user uniquement)
-- ✅ Directory `.secrets/` en 700
-- ✅ Pas de logs du password (grep filtre `[sudo]`)
-- ⚠️ Password en plaintext (acceptable pour VPS privé)
-- ⚠️ Ne JAMAIS commit `.secrets/` dans git
-
-### Cas d'Usage
-
-**ORCHESTRATOR:**
-- PM2 persistence setup
-- Installation packages système (si nécessaire)
-- Configuration services Linux
-
-**EXECUTOR Agent:**
-- Installation dépendances système projet
-- Configuration PostgreSQL
-- Setup Nginx reverse proxy
-- Modifications systemd services
-
-**Skills (deployment, database, etc.):**
-- Toute opération nécessitant root
+**Usage:** Source helper → Check configured → Execute avec sudo_exec
+**Setup:** `./bin/setup-sudo` (one-time)
+**Use cases:** PM2 setup, PostgreSQL config, Nginx, systemd services
 
 ---
 
@@ -1158,72 +811,18 @@ cd /home/pilote/projet/primaire/BUILDER
 
 ## .build/ Management
 
-**Fichiers (créés auto si .build/ absent):**
-- **context.md:** État actuel (stack, routes, composants)
+**Fichiers auto-créés:**
+- **context.md:** Stack, routes, composants actuels
+- **inventory.md:** Inventaire code détaillé (anti-duplication source)
+- **architecture.md:** Module graph + dépendances
 - **tasks.md:** Todo dynamique (in progress, blocked, next)
 - **issues.md:** Bugs résolus + solutions
-- **specs.md:** Plan stratégique projet
-- **timeline.md:** Append-only log
-- **decisions/:** ADRs (décisions architecture majeures)
+- **specs.md:** Vision, roadmap, data models
+- **timeline.md:** Append-only log événements
+- **decisions/:** ADRs (décisions architecture)
 
 **Qui update:** ORCHESTRATOR après EXECUTOR complète
-
-**Templates initiaux (nouveau projet):**
-
-```markdown
-# context.md
-## Stack Technique
-[Sera rempli après détection]
-
-## Architecture Actuelle
-Routes: [Liste routes]
-Composants: [Liste composants]
-
-## Conventions Établies
-[Patterns utilisés]
-```
-
-```markdown
-# specs.md
-# Specs - [NOM PROJET]
-
-## 🎯 Vision
-[1-2 phrases objectif]
-
-## 📦 Stack
-[Stack détectée]
-
-## 📋 Features Roadmap
-- [ ] Feature 1
-- [ ] Feature 2
-
-## 🗂 Data Models
-[Models Prisma/Pydantic]
-```
-
-```markdown
-# timeline.md
-## YYYY-MM-DD HH:MM - Init projet
-✓ Projet créé
-```
-
-**tasks.md, issues.md:** Vides initialement
-
-**context.md update après features:**
-```markdown
-Routes: /blog, /blog/[slug], /new
-Composants: PostCard, PostForm, PostList
-Models: Post (Prisma)
-Stack: Next.js 16 + Prisma + PostgreSQL
-```
-
-**timeline.md append-only:**
-```markdown
-## 2025-01-11 14:30 - CRUD Articles
-✓ Feature complétée
-Files: app/blog/page.tsx, components/post-card.tsx, lib/actions/posts.ts
-Tests: ✓ Passed
-```
+**Update pattern:** context.md (nouveaux composants) → inventory.md (inventaire) → architecture.md (si nouveau module) → tasks.md (move completed) → timeline.md (append log)
 
 ---
 
@@ -1356,49 +955,24 @@ Layer 5: .stack/ template (base projet)
 
 **Exemples concrets:**
 
-**Bug: Prisma relations bidirectionnelles manquantes**
+**Exemple: Prisma relations bidirectionnelles manquantes**
 ```typescript
-ROOT CAUSE: Skill database manque check relations
-
-UPDATES:
-1. ✅ .claude/skills/database/SKILL.md
-   → Section "PRISMA RELATIONS BIDIRECTIONNELLES"
-   → CHECK obligatoire: Foreign key = @relation + inverse
-
-2. ✅ CLAUDE.md
-   → CHECK 5 ajouté (Database Workflow Phase 3)
-
-3. ✅ Agent prompt template
-   → Keyword: "Relations MUST be bidirectional"
-
-RÉSULTAT: Next database project → 0 bugs relations
+// 1. DIAGNOSE: Skill database manque check relations
+// 2. IDENTIFY LAYER: Skills (database) + CLAUDE.md (CHECK 5)
+// 3. UPDATE:
+//    - .claude/skills/database/SKILL.md → Section relations bidirectionnelles
+//    - CLAUDE.md → CHECK 5 ajouté (Database Workflow Phase 3)
+//    - Agent prompt → Keyword "Relations MUST be bidirectional"
+// 4. DOCUMENT: .claude/skills/database/PATTERNS.md
+// 5. COMMIT: fix(system): enforce Prisma bidirectional relations
+// 6. VERIFY: Grep skills pour pattern similaires
+// RÉSULTAT: 0 bugs relations depuis
 ```
 
-**Bug: Orchestrator a oublié lire .build/**
-```typescript
-ROOT CAUSE: Workflow gap - pas de hard stop
-
-UPDATES:
-1. ✅ CLAUDE.md
-   → Renforce CHECK -2
-   → Ajoute: "STOP IMMÉDIAT si detect 'modify' sans .build/ read"
-
-RÉSULTAT: Impossible skip .build/ maintenant
-```
-
-**Bug: Agent a créé duplicate component**
-```typescript
-ROOT CAUSE: Prompt agent manque vérification
-
-UPDATES:
-1. ✅ Mes prompts agents
-   → Keyword ajouté: "VERIFY no duplicate in components/"
-
-2. ✅ .claude/skills/frontend/SKILL.md
-   → Renforce anti-dup check obligatoire
-
-RÉSULTAT: 0 duplicates component
-```
+**Autres exemples résolus:**
+- Orchestrator skip .build/ → Renforce CHECK -2 STOP IMMÉDIAT
+- Duplicate component → Prompt agent + frontend skill anti-dup
+- Build fail TypeScript → Ajoute typecheck avant build
 
 #### STEP 4: DOCUMENT PATTERN
 
