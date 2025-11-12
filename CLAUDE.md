@@ -101,10 +101,11 @@ SI User demande "Ajoute feature" OU "Fixe bug" OU "Modifie":
 
   ✅ OBLIGATION ABSOLUE (dans l'ORDRE):
   1. Read .build/context.md (stack, composants, routes existants)
-  2. Read .build/tasks.md (éviter duplication tâches)
-  3. Read .build/issues.md (solutions bugs connus)
+  2. Read .build/architecture.md (module graph + dépendances)
+  3. Read .build/tasks.md (éviter duplication tâches)
+  4. Read .build/issues.md (solutions bugs connus)
 
-  ✅ RÉSULTAT: Je connais état actuel en ~1000 tokens
+  ✅ RÉSULTAT: Je connais état actuel + module dependencies en ~1500 tokens
   ✅ PUIS: Continue CHECK -1, CHECK 0, etc.
 
 SI .build/ absent (nouveau projet):
@@ -112,6 +113,7 @@ SI .build/ absent (nouveau projet):
 
 APRÈS chaque EXECUTOR complète (OBLIGATION):
   ✅ Update .build/context.md (nouveaux composants/routes/models)
+  ✅ Update .build/architecture.md (si nouveau module créé)
   ✅ Update .build/tasks.md (move task → completed)
   ✅ Append .build/timeline.md (log événement avec timestamp)
 
@@ -156,24 +158,28 @@ User demande feature complexe OU nouveau projet:
   ❌ INTERDIT: Compter fichiers moi-même
   ❌ INTERDIT: Proposer schema database
   ❌ INTERDIT: Décider structure frontend
-  ❌ INTERDIT: Glob/Grep/Read pour scanner (EXECUTOR le fait)
   ❌ INTERDIT: Analyser dépendances moi-même
 
   ✅ OBLIGATION: Task(executor, sonnet, "MODE: CONSULT...")
-  ✅ EXECUTOR = Dependency Graph Engine (scan batch rapide)
-  ✅ EXECUTOR charge 50k tokens skills → scan 10s → build graph → retourne JSON
+  ✅ EXECUTOR = Dependency Graph Engine
+  ✅ EXECUTOR charge skills → lit .build/architecture.md → retourne JSON vagues
   ✅ MOI: Reçois JSON vagues → Parse → Execute aveuglément
 
-STRATÉGIE TOKEN + SCAN:
+STRATÉGIE TOKEN (pas de scan):
 - EXECUTOR context = jetable (nouvelle instance)
-- EXECUTOR scan = batch Glob + Grep (<10s pour 500 fichiers)
+- EXECUTOR lit .build/ (context.md + architecture.md) = ~1500 tokens
 - MOI context = critique (conversation longue, pas compaction)
-- MOI scan = ZÉRO (EXECUTOR fait tout)
-- Shift complexité + scan chez EXECUTOR → Retour JSON léger
+- MOI ne lis RIEN sauf résultat EXECUTOR
+- Shift complexité chez EXECUTOR → Retour JSON léger
+
+SOURCE VÉRITÉ:
+- .build/context.md = État actuel (stack, composants, routes)
+- .build/architecture.md = Module graph (qui dépend de quoi)
+- Skills = Conventions (Next.js, Prisma patterns)
 
 RAPPEL ABSOLU:
 Je n'ai AUCUN skill chargé. EXECUTOR a 11 skills.
-Je ne scanne RIEN. EXECUTOR = scan engine.
+EXECUTOR lit architecture.md pour parallélisation.
 Jamais deviner. Toujours consulter.
 ```
 
@@ -184,8 +190,8 @@ Jamais deviner. Toujours consulter.
 - Nouvelle stack/librairie
 
 **Ce que EXECUTOR retourne (JSON ready-to-execute):**
-- Scan results (structure détectée, conventions, patterns)
-- Dependency graph (qui dépend de quoi)
+- Modules impactés (database, types, actions, components, pages)
+- Dependency graph calculé depuis architecture.md
 - Vagues optimales (JSON avec paths absolus, actions, temps)
 - Performance metrics (X agents, Y vagues, Zmin)
 
@@ -436,71 +442,73 @@ User Answers:
 - Auth: [oui/non]
 - Database: [PostgreSQL/JSON/Supabase]
 
-Context: [SI nouveau: "Nouveau projet" | SI existant: coller .build/context.md]
+Context Projet:
+[SI nouveau: "Nouveau projet"]
+[SI existant: Coller .build/context.md + .build/architecture.md]
 
-SCAN RAPIDE OBLIGATOIRE (BATCH - 5-7 secondes max):
+⚠️ STRATÉGIE (PAS DE SCAN FILESYSTEM):
 
-⚠️ INTERDICTION ABSOLUE:
-❌ JAMAIS Read fichier par fichier (1h scan = ÉCHEC)
-❌ JAMAIS boucle séquentielle sur fichiers
-❌ JAMAIS AST parser lent
+1. **Read .build/context.md** (si existe):
+   - Stack actuel
+   - Composants existants
+   - Routes actuelles
 
-✅ STRATÉGIE BATCH UNIQUEMENT:
+2. **Read .build/architecture.md** (si existe):
+   - Module graph
+   - Dépendances modules
+   - Structure actuelle
 
-1. **Glob scan structure (1-2s):**
-   Glob("**/*.{ts,tsx,js,jsx,prisma}", path: "/frontend")
-   → Output: Liste tous paths
+3. **Charge skills appropriés:**
+   - Database skill (Prisma conventions)
+   - Frontend skill (Next.js patterns)
+   - Integration skill (Server actions)
 
-2. **Grep all imports (3-5s):**
-   Grep("^import .* from ['\\\"]", {
-     output_mode: "content",
-     glob: "**/*.{ts,tsx}",
-     path: "/frontend"
-   })
-   → Output: Tous imports tous fichiers d'un coup
+4. **Analyse avec skills:**
+   - Détermine modules impactés par feature
+   - Utilise architecture.md pour ordre exécution
+   - Applique conventions skills
 
-3. **Parse in-memory (instantané):**
-   Analyse output Grep → Build dependency graph
-
-4. **Read .build/context.md UNIQUEMENT (si existe):**
-   1 seul Read (état actuel projet)
-
-TOTAL SCAN: <10 secondes pour 500+ fichiers
+TOTAL TIME: <5 secondes (2 Reads + skills analyse)
 
 DEPENDENCY GRAPH ENGINE:
 
-1. Liste TOUS fichiers à créer pour feature
-2. Pour chaque fichier: extrait imports depuis patterns skills
-3. Build graph: file → [dependencies]
-4. Topological sort → calcul niveaux (L0, L1, L2...)
-5. Vagues = niveaux (L0 = Vague 1, etc.)
+1. Identifie modules impactés (database, types, actions, components, pages)
+2. Lit architecture.md → dépendances modules
+3. Topological sort modules (pas fichiers individuels)
+4. Liste fichiers par module selon skills conventions
+5. Retourne vagues par niveau module
 
 FORMAT RETOUR OBLIGATOIRE:
 
-## Scan Projet (batch executé)
-- Structure détectée: [Next.js App Router/React/etc.]
-- Conventions paths:
-  * Types: [pattern détecté, ex: /lib/types/*.ts]
-  * Actions: [pattern, ex: /app/actions/*.ts]
-  * Components: [pattern, ex: /components/features/*]
-- Fichiers scannés: X fichiers (Yms)
-- Patterns imports: [@/lib/types, @/components/ui, etc.]
+## Analyse (.build/ reads)
+- Context lu: [Stack, X composants, Y routes]
+- Architecture lu: [Z modules définis]
+- Modules impactés: [database, types, actions, components, pages]
 
-## Fichiers à Créer: Y fichiers
-
-## Dependency Graph (calculated)
+## Dependency Graph (depuis architecture.md)
 \`\`\`
-[Graph ASCII ou description niveaux:
-L0: schema.prisma, schemas/validation.ts (aucune dépendance)
-L1: types/kanban.ts (dépend: L0 Prisma generate)
-L2: kanban-card.tsx, store.ts (dépend: L1 types)
-L3: actions/kanban.ts (dépend: L1 types + L0 schemas)
-L4: kanban-board.tsx (dépend: L2 + L3)
-L5: page.tsx (dépend: L4)
-]
+Module: database
+- Depends: []
+- Files: schema.prisma, lib/prisma.ts
+
+Module: types
+- Depends: [database]
+- Files: lib/types/*.ts
+
+Module: actions
+- Depends: [database, types]
+- Files: app/actions/*.ts
+
+Module: components
+- Depends: [types]
+- Files: components/features/*.tsx
+
+Module: pages
+- Depends: [components, actions]
+- Files: app/**/*.tsx
 \`\`\`
 
-## Vagues Optimales: Z vagues
+## Vagues Optimales (topological sort modules)
 
 **VAGUE 1 (N agents parallèles - Level 0):**
 \`\`\`json
