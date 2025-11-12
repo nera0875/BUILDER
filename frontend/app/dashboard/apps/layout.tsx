@@ -13,10 +13,8 @@ export default function AppsLayout({
 
   // Determine active view from current pathname
   const getActiveView = (): NavItemId => {
-    if (pathname.includes('/apps/kanban')) return 'kanban'
-    if (pathname.includes('/apps/todo')) return 'todo'
     if (pathname.includes('/apps/tasks')) return 'tasks'
-    return 'kanban'
+    return 'tasks'
   }
 
   return (

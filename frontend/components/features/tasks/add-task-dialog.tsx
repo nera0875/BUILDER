@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { createTask } from "@/app/actions/tasks-actions"
+import { createTask } from "@/app/actions/task-actions"
 import { toast } from "sonner"
 import { TaskStatus, TaskPriority, TaskLabel } from "./data/schema"
 

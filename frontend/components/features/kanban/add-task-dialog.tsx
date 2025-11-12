@@ -20,17 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { createTask } from "@/app/actions/kanban-actions"
+import { createTask } from "@/app/actions/task-actions"
 import { toast } from "sonner"
+import type { TaskStatus } from "@/lib/types/task"
 
 interface AddTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  columnId: string
+  status?: TaskStatus
   onTaskCreated?: () => void
 }
 
-export function AddTaskDialog({ open, onOpenChange, columnId, onTaskCreated }: AddTaskDialogProps) {
+export function AddTaskDialog({ open, onOpenChange, status, onTaskCreated }: AddTaskDialogProps) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
@@ -48,7 +49,7 @@ export function AddTaskDialog({ open, onOpenChange, columnId, onTaskCreated }: A
     const result = await createTask({
       title,
       description,
-      columnId,
+      status: status || "todo",
       priority,
       dueDate: dueDate || undefined,
     })

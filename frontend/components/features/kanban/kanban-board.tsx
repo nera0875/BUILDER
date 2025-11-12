@@ -6,7 +6,6 @@ import {
   Paperclip,
   MessageSquare,
   PlusCircleIcon,
-  CheckIcon,
   SlidersHorizontalIcon,
   SearchIcon
 } from "lucide-react";
@@ -31,18 +30,13 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
 import AddAssigne from "./add-assignee-dialog";
 import { AddTaskDialog } from "./add-task-dialog";
-import { getColumns, createColumn } from "@/app/actions/kanban-actions";
+import { getTasks, reorderTasks } from "@/app/actions/task-actions";
+import { TASK_STATUS_MAP } from "@/lib/enums/task-status";
+import type { TaskStatus, Task as TaskType } from "@/lib/types/task";
 
 interface Task {
   id: string;
@@ -91,8 +85,13 @@ function transformTaskData(prismaTask: any): Task {
 }
 
 export default function KanbanBoard() {
-  const [columns, setColumns] = React.useState<Record<string, Task[]>>({});
-  const [columnTitles, setColumnTitles] = React.useState<Record<string, string>>({});
+  const [columns, setColumns] = React.useState<Record<TaskStatus, Task[]>>({
+    backlog: [],
+    todo: [],
+    "in-progress": [],
+    done: [],
+    canceled: []
+  });
   const [filteredColumns, setFilteredColumns] = React.useState(columns);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -101,29 +100,29 @@ export default function KanbanBoard() {
   const [filterUser, setFilterUser] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
 
-  const [isNewColumnModalOpen, setIsNewColumnModalOpen] = React.useState(false);
-  const [newColumnTitle, setNewColumnTitle] = React.useState("");
-
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [addTaskColumnId, setAddTaskColumnId] = React.useState<string | null>(null);
+  const [addTaskStatus, setAddTaskStatus] = React.useState<TaskStatus | null>(null);
 
   // Fetch data from PostgreSQL on mount
   React.useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
-      const result = await getColumns();
+      const result = await getTasks({ groupByStatus: true });
 
       if (result.success && result.data) {
-        const columnsData: Record<string, Task[]> = {};
-        const titles: Record<string, string> = {};
+        const columnsData: Record<TaskStatus, Task[]> = {
+          backlog: [],
+          todo: [],
+          "in-progress": [],
+          done: [],
+          canceled: []
+        };
 
-        result.data.forEach((column: any) => {
-          columnsData[column.id] = column.tasks.map(transformTaskData);
-          titles[column.id] = column.title;
+        Object.entries(result.data).forEach(([status, tasks]) => {
+          columnsData[status as TaskStatus] = (tasks as TaskType[]).map(transformTaskData);
         });
 
         setColumns(columnsData);
-        setColumnTitles(titles);
       }
       setIsLoading(false);
     }
@@ -140,10 +139,11 @@ export default function KanbanBoard() {
   };
 
   const filterTasks = React.useCallback(() => {
-    let filtered: Record<string, Task[]> = { ...columns };
+    let filtered: Record<TaskStatus, Task[]> = { ...columns };
 
     Object.keys(filtered).forEach((columnKey) => {
-      filtered[columnKey] = columns[columnKey].filter((task) => {
+      const status = columnKey as TaskStatus;
+      filtered[status] = columns[status].filter((task) => {
         const searchMatch =
           searchQuery === "" ||
           task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,11 +175,25 @@ export default function KanbanBoard() {
     filterTasks();
   }, [filterTasks]);
 
-  // Handle column changes with optimistic updates
-  const handleColumnsChange = async (newColumns: Record<string, Task[]>) => {
+  // Handle column changes with optimistic updates and backend sync
+  const handleColumnsChange = async (newColumns: Record<TaskStatus, Task[]>) => {
     setColumns(newColumns);
 
-    // TODO: Sync changes to backend via reorderTasks action
+    // Calculate reorder updates
+    const updates: any[] = [];
+
+    Object.entries(newColumns).forEach(([status, tasks]) => {
+      tasks.forEach((task, index) => {
+        updates.push({
+          id: task.id,
+          status: status as TaskStatus,
+          order: index
+        });
+      });
+    });
+
+    // Sync to backend
+    await reorderTasks(updates);
   };
 
   const FilterDropdown = () => {
@@ -302,24 +316,6 @@ export default function KanbanBoard() {
     );
   };
 
-  async function addColumn(title: string) {
-    const result = await createColumn(title);
-
-    if (result.success && result.data) {
-      setColumns((prev) => ({
-        ...prev,
-        [result.data.id]: []
-      }));
-      setColumnTitles((prev) => ({
-        ...prev,
-        [result.data.id]: result.data.title
-      }));
-    }
-
-    setNewColumnTitle("");
-    setIsNewColumnModalOpen(false);
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -386,42 +382,6 @@ export default function KanbanBoard() {
             </div>
 
             <FilterDropdown />
-
-            <Dialog open={isNewColumnModalOpen} onOpenChange={setIsNewColumnModalOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <PlusCircleIcon />
-                  <span className="hidden lg:inline">Add Board</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Board</DialogTitle>
-                </DialogHeader>
-                <div className="mt-4 flex gap-2">
-                  <Input
-                    id="name"
-                    value={newColumnTitle}
-                    onChange={(e) => setNewColumnTitle(e.target.value)}
-                    className="col-span-3"
-                    placeholder="Enter board name..."
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newColumnTitle.trim()) {
-                        addColumn(newColumnTitle.trim());
-                      }
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={!newColumnTitle.trim()}
-                    onClick={() => addColumn(newColumnTitle.trim())}>
-                    <CheckIcon />
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
         <TabsContent value="board">
@@ -430,38 +390,42 @@ export default function KanbanBoard() {
             onValueChange={handleColumnsChange}
             getItemValue={(item) => item.id}>
             <Kanban.Board className="flex w-full gap-4 overflow-x-auto pb-4">
-              {Object.entries(filteredColumns).map(([columnValue, tasks]) => (
-                <Kanban.Column
-                  key={columnValue}
-                  value={columnValue}
-                  className="w-[340px] min-w-[340px]">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{columnTitles[columnValue]}</span>
-                      <Badge variant="outline">{tasks.length}</Badge>
-                    </div>
-                    <div className="flex">
-                      <Kanban.ColumnHandle asChild>
-                        <Button variant="ghost" size="icon">
-                          <GripVertical className="h-4 w-4" />
-                        </Button>
-                      </Kanban.ColumnHandle>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setAddTaskColumnId(columnValue)}
-                          >
-                            <PlusCircleIcon />
+              {Object.entries(filteredColumns).map(([columnValue, tasks]) => {
+                const status = columnValue as TaskStatus;
+                const statusConfig = TASK_STATUS_MAP[status];
+
+                return (
+                  <Kanban.Column
+                    key={columnValue}
+                    value={columnValue}
+                    className="w-[340px] min-w-[340px]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{statusConfig.title}</span>
+                        <Badge variant="outline">{tasks.length}</Badge>
+                      </div>
+                      <div className="flex">
+                        <Kanban.ColumnHandle asChild>
+                          <Button variant="ghost" size="icon">
+                            <GripVertical className="h-4 w-4" />
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Add Task</p>
-                        </TooltipContent>
-                      </Tooltip>
+                        </Kanban.ColumnHandle>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setAddTaskStatus(status)}
+                            >
+                              <PlusCircleIcon />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add Task</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
-                  </div>
                   {tasks.length > 0 ? (
                     <div className="flex flex-col gap-2 p-0.5">
                       {tasks.map((task) => (
@@ -552,14 +516,15 @@ export default function KanbanBoard() {
                       <div className="text-muted-foreground text-sm">No task added here.</div>
                       <Button
                         variant="outline"
-                        onClick={() => setAddTaskColumnId(columnValue)}
+                        onClick={() => setAddTaskStatus(status)}
                       >
                         Add Task
                       </Button>
                     </div>
                   )}
                 </Kanban.Column>
-              ))}
+                );
+              })}
             </Kanban.Board>
             <Kanban.Overlay>
               <div className="bg-primary/10 size-full rounded-md" />
@@ -571,24 +536,27 @@ export default function KanbanBoard() {
       </Tabs>
 
       <AddTaskDialog
-        open={addTaskColumnId !== null}
-        onOpenChange={(open) => !open && setAddTaskColumnId(null)}
-        columnId={addTaskColumnId || ""}
+        open={addTaskStatus !== null}
+        onOpenChange={(open) => !open && setAddTaskStatus(null)}
+        status={addTaskStatus || undefined}
         onTaskCreated={() => {
-          // Refresh data by refetching columns
+          // Refresh data by refetching tasks
           const fetchData = async () => {
-            const result = await getColumns();
+            const result = await getTasks({ groupByStatus: true });
             if (result.success && result.data) {
-              const columnsData: Record<string, Task[]> = {};
-              const titles: Record<string, string> = {};
+              const columnsData: Record<TaskStatus, Task[]> = {
+                backlog: [],
+                todo: [],
+                "in-progress": [],
+                done: [],
+                canceled: []
+              };
 
-              result.data.forEach((column: any) => {
-                columnsData[column.id] = column.tasks.map(transformTaskData);
-                titles[column.id] = column.title;
+              Object.entries(result.data).forEach(([status, tasks]) => {
+                columnsData[status as TaskStatus] = (tasks as TaskType[]).map(transformTaskData);
               });
 
               setColumns(columnsData);
-              setColumnTitles(titles);
             }
           };
           fetchData();

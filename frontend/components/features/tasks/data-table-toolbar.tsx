@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { Table } from "@tanstack/react-table";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTableViewOptions } from "./data-table-view-options";
 import { AddTaskDialog } from "./add-task-dialog";
 
-import { priorities, statuses } from "./data/data";
+import { priorities, statuses, labels } from "./data/data";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
+import { bulkDeleteTasks } from "@/app/actions/task-actions";
+import type { Task } from "@/lib/types/task";
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
@@ -18,7 +20,31 @@ interface DataTableToolbarProps<TData> {
 
 export function DataTableToolbar<TData>({ table }: DataTableToolbarProps<TData>) {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isFiltered = table.getState().columnFilters.length > 0;
+  const selectedRows = table.getFilteredSelectedRowModel().rows;
+  const hasSelection = selectedRows.length > 0;
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ${selectedRows.length} selected task(s)?`)) return;
+
+    setIsDeleting(true);
+    try {
+      const ids = selectedRows.map(row => (row.original as Task).id);
+      const result = await bulkDeleteTasks(ids);
+
+      if (!result.success) {
+        alert(`Error: ${result.error}`);
+      } else {
+        table.resetRowSelection();
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      alert("Failed to delete tasks");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-2">
@@ -49,6 +75,20 @@ export function DataTableToolbar<TData>({ table }: DataTableToolbarProps<TData>)
               options={priorities}
             />
           )}
+          {table.getColumn("label") && (
+            <DataTableFacetedFilter
+              column={table.getColumn("label")}
+              title="Label"
+              options={labels}
+            />
+          )}
+          {table.getColumn("assignee") && (
+            <DataTableFacetedFilter
+              column={table.getColumn("assignee")}
+              title="Assignee"
+              options={[]} // Will be dynamically populated from unique values
+            />
+          )}
           {isFiltered && (
             <Button variant="ghost" size="sm" onClick={() => table.resetColumnFilters()}>
               Reset
@@ -56,7 +96,18 @@ export function DataTableToolbar<TData>({ table }: DataTableToolbarProps<TData>)
             </Button>
           )}
         </div>
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="flex items-center gap-2">
+          {hasSelection && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isDeleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete ({selectedRows.length})
+            </Button>
+          )}
           <DataTableViewOptions table={table} />
           <Button size="sm" onClick={() => setShowAddDialog(true)}>Add Task</Button>
         </div>

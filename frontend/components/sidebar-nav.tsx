@@ -8,12 +8,10 @@ import {
   TestTube,
   Activity,
   LayoutDashboard,
-  Kanban,
-  CheckSquare,
   ListTodo
 } from 'lucide-react'
 
-export type NavItemId = 'projects' | 'devtools' | 'health' | 'diagnostics' | 'kanban' | 'todo' | 'tasks'
+export type NavItemId = 'projects' | 'devtools' | 'health' | 'diagnostics' | 'tasks'
 
 interface NavItem {
   id: NavItemId
@@ -36,9 +34,7 @@ const navItems: NavItem[] = [
 ]
 
 const appItems: NavItem[] = [
-  { id: 'kanban', label: 'Kanban Board', icon: Kanban, href: '/dashboard/apps/kanban' },
-  { id: 'todo', label: 'Todo List', icon: CheckSquare, href: '/dashboard/apps/todo' },
-  { id: 'tasks', label: 'Tasks Manager', icon: ListTodo, href: '/dashboard/apps/tasks' },
+  { id: 'tasks', label: 'Tasks', icon: ListTodo, href: '/dashboard/apps/tasks' },
 ]
 
 export function SidebarNav({

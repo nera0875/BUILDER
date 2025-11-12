@@ -20,15 +20,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { deleteTask, updateTask } from "@/app/actions/task-actions";
-import { priorities, statuses } from "./data/data";
-import { taskSchema } from "./data/schema";
+import { priorities, statuses, labels } from "./data/data";
+import type { Task, TaskStatus, TaskPriority, TaskLabel } from "@/lib/types/task";
 
-interface DataTableRowActionsProps<TData> {
-  row: Row<TData>;
+interface TableRowActionsProps {
+  row: Row<Task>;
 }
 
-export function DataTableRowActions<TData>({ row }: DataTableRowActionsProps<TData>) {
-  const task = taskSchema.parse(row.original);
+export function TableRowActions({ row }: TableRowActionsProps) {
+  const task = row.original;
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -51,7 +51,7 @@ export function DataTableRowActions<TData>({ row }: DataTableRowActionsProps<TDa
   const handleStatusChange = async (newStatus: string) => {
     setIsLoading(true);
     try {
-      const result = await updateTask(task.id, { status: newStatus as any });
+      const result = await updateTask(task.id, { status: newStatus as TaskStatus });
       if (!result.success) {
         alert(`Error: ${result.error}`);
       }
@@ -66,7 +66,22 @@ export function DataTableRowActions<TData>({ row }: DataTableRowActionsProps<TDa
   const handlePriorityChange = async (newPriority: string) => {
     setIsLoading(true);
     try {
-      const result = await updateTask(task.id, { priority: newPriority as any });
+      const result = await updateTask(task.id, { priority: newPriority as TaskPriority });
+      if (!result.success) {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+      alert("Failed to update task");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLabelChange = async (newLabel: string) => {
+    setIsLoading(true);
+    try {
+      const result = await updateTask(task.id, { label: newLabel as TaskLabel });
       if (!result.success) {
         alert(`Error: ${result.error}`);
       }
@@ -119,6 +134,19 @@ export function DataTableRowActions<TData>({ row }: DataTableRowActionsProps<TDa
               {priorities.map((priority) => (
                 <DropdownMenuRadioItem key={priority.value} value={priority.value}>
                   {priority.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>Label</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup value={task.label} onValueChange={handleLabelChange}>
+              {labels.map((label) => (
+                <DropdownMenuRadioItem key={label.value} value={label.value}>
+                  {label.label}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
